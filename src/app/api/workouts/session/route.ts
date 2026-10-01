@@ -11,6 +11,16 @@ function parseDate(value: unknown) {
   return date;
 }
 
+export async function GET(request: Request) {
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: "Non autorizzato" }, { status: 401 });
+  const url = new URL(request.url);
+  const templateId = url.searchParams.get("template");
+  if (!templateId) return NextResponse.json({ session: null });
+  const session = await prisma.workoutSession.findFirst({ where: { userId: user.id, completedAt: null, plan: { isActive: true, isTemplate: false, templates: { some: { id: templateId } } } }, orderBy: { startedAt: "desc" }, select: { id: true, startedAt: true, sets: { orderBy: [{ exerciseId: "asc" }, { setNumber: "asc" }], select: { id: true, exerciseId: true, setNumber: true, weight: true, reps: true, rir: true, completed: true } } } });
+  return NextResponse.json({ session });
+}
+
 export async function POST(request: Request) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Non autorizzato" }, { status: 401 });
@@ -39,8 +49,10 @@ export async function PATCH(request: Request) {
     const body = await request.json();
     const sessionId = typeof body.sessionId === "string" ? body.sessionId : "";
     if (!sessionId) return NextResponse.json({ error: "Sessione non valida." }, { status: 400 });
-    const session = await prisma.workoutSession.updateMany({ where: { id: sessionId, userId: user.id, completedAt: null }, data: { completedAt: new Date() } });
-    if (!session.count) return NextResponse.json({ error: "Sessione non trovata." }, { status: 404 });
+    const session = await prisma.workoutSession.findFirst({ where: { id: sessionId, userId: user.id, completedAt: null }, include: { sets: true } });
+    if (!session) return NextResponse.json({ error: "Sessione non trovata." }, { status: 404 });
+    if (!session.sets.length || session.sets.some(set => !set.completed)) return NextResponse.json({ error: "Completa e salva almeno una serie per ogni esercizio prima di chiudere l'allenamento." }, { status: 400 });
+    await prisma.workoutSession.update({ where: { id: sessionId }, data: { completedAt: new Date() } });
     return NextResponse.json({ ok: true });
   } catch (error) {
     console.error("[workouts/session PATCH]", error);

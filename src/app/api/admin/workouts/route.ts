@@ -27,7 +27,20 @@ export async function POST(request: Request) {
       for (let i = 0; i < items.length; i++) {
         const item = items[i];
         const repMin = Math.max(1, Number(item.repMin) || 1);
-        await tx.workoutExercise.create({ data: { templateId: template.id, exerciseId: item.exerciseId, orderIndex: i, sets: Math.max(1, Number(item.sets) || 1), repMin, repMax: Math.max(repMin, Number(item.repMax) || repMin), rirTarget: item.rirTarget === "" || item.rirTarget == null ? null : Number(item.rirTarget), restSeconds: Math.max(0, Number(item.restSeconds) || 0) } });
+        const setType = typeof item.setType === "string" ? item.setType : "NORMAL";
+        const progressionType = typeof item.progressionType === "string" ? item.progressionType : "DOUBLE_PROGRESSION";
+        await tx.workoutExercise.create({ data: {
+          templateId: template.id, exerciseId: item.exerciseId, orderIndex: i,
+          sets: Math.max(1, Number(item.sets) || 1), repMin,
+          repMax: Math.max(repMin, Number(item.repMax) || repMin),
+          rirTarget: item.rirTarget === "" || item.rirTarget == null ? null : Number(item.rirTarget),
+          restSeconds: Math.max(0, Number(item.restSeconds) || 0),
+          setType, progressionType,
+          loadIncrement: item.loadIncrement === "" || item.loadIncrement == null ? null : Number(item.loadIncrement),
+          tempo: item.tempo?.trim() || null,
+          targetWeight: item.targetWeight === "" || item.targetWeight == null ? null : Number(item.targetWeight),
+          notes: item.notes?.trim() || null,
+        } });
       }
     }
     return tx.workoutPlan.findUnique({ where: { id: created.id }, include: { templates: { include: { exercises: true } } } });

@@ -1,0 +1,200 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole { USER ADMIN SUPER_ADMIN }
+enum GoalType { FAT_LOSS MUSCLE_GAIN RECOMPOSITION STRENGTH GENERAL_FITNESS }
+enum Difficulty { BEGINNER INTERMEDIATE ADVANCED }
+enum MediaType { VIDEO WEBM GIF IMAGE }
+
+enum Muscle {
+  CHEST BACK SHOULDERS BICEPS TRICEPS ABS GLUTES QUADS HAMSTRINGS CALVES LOWER_BACK
+}
+
+model User {
+  id                 String                 @id @default(cuid())
+  email              String                 @unique
+  role               UserRole               @default(USER)
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+  profile            Profile?
+  onboarding         OnboardingResponse?
+  plans              WorkoutPlan[]
+  sessions           WorkoutSession[]
+  weightLogs         WeightLog[]
+  bodyMeasurements   BodyMeasurement[]
+  notificationPrefs  NotificationPreference?
+  auditEntries       AuditLog[]
+}
+
+model Profile {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  firstName      String?
+  age            Int?
+  sex            String?
+  heightCm       Float?
+  currentWeight  Float?
+  targetWeight   Float?
+  experience    String?
+  trainingDays   Int?
+  sessionMinutes Int?
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model OnboardingResponse {
+  id                 String   @id @default(cuid())
+  userId             String   @unique
+  primaryGoal        GoalType?
+  secondaryGoal      GoalType?
+  targetDate         DateTime?
+  environment        String?
+  equipmentJson      String   @default("[]")
+  preferencesJson    String   @default("{}")
+  limitationsJson    String   @default("{}")
+  musclePrioritiesJson String @default("{}")
+  completedAt        DateTime?
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Exercise {
+  id               String           @id @default(cuid())
+  name             String
+  slug             String           @unique
+  category         String
+  primaryMuscles   String
+  secondaryMuscles String           @default("[]")
+  equipment        String           @default("[]")
+  difficulty       Difficulty       @default(BEGINNER)
+  instructionsJson String           @default("[]")
+  mistakesJson     String           @default("[]")
+  cuesJson         String           @default("[]")
+  isActive         Boolean          @default(true)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  media            ExerciseMedia[]
+  workoutExercises WorkoutExercise[]
+}
+
+model ExerciseMedia {
+  id           String    @id @default(cuid())
+  exerciseId   String
+  type         MediaType
+  url          String
+  thumbnailUrl String?
+  sourceName   String?
+  sourceUrl    String?
+  license      String?
+  attribution  String?
+  isPrimary    Boolean   @default(false)
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  exercise     Exercise  @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+}
+
+model WorkoutPlan {
+  id          String            @id @default(cuid())
+  userId      String
+  name        String
+  version     Int               @default(1)
+  isActive    Boolean           @default(true)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  user        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  templates   WorkoutTemplate[]
+  sessions    WorkoutSession[]
+}
+
+model WorkoutTemplate {
+  id             String            @id @default(cuid())
+  workoutPlanId  String
+  dayNumber      Int
+  name           String
+  estimatedMins  Int?
+  createdAt      DateTime          @default(now())
+  plan           WorkoutPlan       @relation(fields: [workoutPlanId], references: [id], onDelete: Cascade)
+  exercises      WorkoutExercise[]
+}
+
+model WorkoutExercise {
+  id             String          @id @default(cuid())
+  templateId     String
+  exerciseId     String
+  orderIndex     Int
+  sets           Int
+  repMin         Int
+  repMax         Int
+  rirTarget      Float?
+  restSeconds    Int
+  template       WorkoutTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  exercise       Exercise        @relation(fields: [exerciseId], references: [id])
+}
+
+model WorkoutSession {
+  id            String       @id @default(cuid())
+  userId        String
+  workoutPlanId String
+  startedAt     DateTime     @default(now())
+  completedAt   DateTime?
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan          WorkoutPlan  @relation(fields: [workoutPlanId], references: [id])
+  sets          WorkoutSet[]
+}
+
+model WorkoutSet {
+  id               String         @id @default(cuid())
+  sessionId        String
+  exerciseId       String
+  setNumber        Int
+  weight           Float
+  reps             Int
+  rir              Float?
+  completed        Boolean        @default(false)
+  timestamp        DateTime       @default(now())
+  session          WorkoutSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+}
+
+model WeightLog {
+  id        String   @id @default(cuid())
+  userId    String
+  weightKg  Float
+  recordedAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model BodyMeasurement {
+  id          String   @id @default(cuid())
+  userId      String
+  waistCm     Float?
+  chestCm     Float?
+  armCm       Float?
+  thighCm     Float?
+  hipCm       Float?
+  recordedAt  DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model NotificationPreference {
+  id             String  @id @default(cuid())
+  userId         String  @unique
+  workoutReminders Boolean @default(true)
+  weeklySummary   Boolean @default(true)
+  user            User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  action    String
+  entity    String
+  entityId  String?
+  metadata  String   @default("{}")
+  createdAt DateTime @default(now())
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+}

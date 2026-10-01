@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 
 interface Exercise {
@@ -46,7 +47,7 @@ export default function AdminExercisesPage() {
             {exercises.map((exercise) => {
               const media = exercise.media[0];
               return (
-                <article key={exercise.id} className="overflow-hidden rounded-3xl border border-[var(--border)] bg-[var(--surface)] shadow-sm">
+                <Link key={exercise.id} href={`/admin/exercises/${exercise.id}`} className="group block overflow-hidden rounded-3xl border border-[var(--border)] bg-[var(--surface)] shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-[var(--accent)]">
                   <div className="flex min-h-36 items-center justify-center bg-black/5 p-5">
                     {media?.type === "IMAGE" || media?.type === "GIF" ? (
                       <img src={media.url} alt={exercise.name} className="max-h-44 w-full rounded-2xl object-contain" />
@@ -59,18 +60,17 @@ export default function AdminExercisesPage() {
                   <div className="p-5">
                     <div className="flex items-start justify-between gap-4">
                       <div>
-                        <h2 className="text-lg font-extrabold">{exercise.name}</h2>
+                        <h2 className="text-lg font-extrabold group-hover:text-[var(--accent)]">{exercise.name}</h2>
                         <p className="mt-1 text-xs font-bold uppercase tracking-wide text-[var(--muted)]">{exercise.primaryMuscles}</p>
                       </div>
                       <span className="rounded-full bg-[var(--accent)]/10 px-3 py-1 text-xs font-bold">{exercise.difficulty}</span>
                     </div>
                     <div className="mt-5 flex items-center justify-between border-t border-[var(--border)] pt-4 text-xs text-[var(--muted)]">
-                      <span>{exercise.category}</span>
-                      <span>{exercise._count.workoutExercises} workout</span>
-                      <span>{media ? "Media ✓" : "Media —"}</span>
+                      <span>{exercise.category}</span><span>{exercise._count.workoutExercises} workout</span><span>{media ? "Media ✓" : "Media —"}</span>
                     </div>
+                    <div className="mt-3 text-xs font-bold text-[var(--accent)]">Modifica esercizio →</div>
                   </div>
-                </article>
+                </Link>
               );
             })}
           </div>

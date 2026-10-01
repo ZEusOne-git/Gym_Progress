@@ -95,22 +95,22 @@ model OnboardingResponse {
 }
 
 model Exercise {
-  id                 String            @id @default(cuid())
-  name               String
-  slug               String            @unique
-  category           String
-  primaryMuscles     String
-  secondaryMuscles   String            @default("[]")
-  equipment          String            @default("[]")
-  difficulty         Difficulty        @default(BEGINNER)
-  instructionsJson   String            @default("[]")
-  mistakesJson       String            @default("[]")
-  cuesJson           String            @default("[]")
-  isActive           Boolean           @default(true)
-  createdAt          DateTime          @default(now())
-  updatedAt          DateTime          @updatedAt
-  media              ExerciseMedia[]
-  workoutExercises   WorkoutExercise[]
+  id               String            @id @default(cuid())
+  name             String
+  slug             String            @unique
+  category         String
+  primaryMuscles   String
+  secondaryMuscles String            @default("[]")
+  equipment        String            @default("[]")
+  difficulty       Difficulty        @default(BEGINNER)
+  instructionsJson String            @default("[]")
+  mistakesJson     String            @default("[]")
+  cuesJson         String            @default("[]")
+  isActive         Boolean           @default(true)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  media            ExerciseMedia[]
+  workoutExercises WorkoutExercise[]
 }
 
 model ExerciseMedia {
@@ -155,7 +155,7 @@ model WorkoutTemplate {
 }
 
 model WorkoutExercise {
-  id             String          @id
+  id             String          @id @default(cuid())
   templateId     String
   exerciseId     String
   orderIndex     Int

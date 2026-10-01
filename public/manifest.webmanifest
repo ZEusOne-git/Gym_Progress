@@ -1,0 +1,11 @@
+{
+  "name": "Gym Progress",
+  "short_name": "Gym Progress",
+  "description": "Personalized training and progress tracking",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#071615",
+  "theme_color": "#071615",
+  "orientation": "portrait",
+  "icons": []
+}

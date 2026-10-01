@@ -1,1 +1,0 @@
-export default function TestPage(){return <main>Admin users detail</main>}

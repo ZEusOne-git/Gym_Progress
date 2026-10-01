@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 
 type Exercise = {
@@ -18,92 +18,113 @@ type Exercise = {
 type Props = { exercise: Exercise };
 
 export default function ExercisePlayer({ exercise }: Props) {
+  const videoRef = useRef<HTMLVideoElement>(null);
   const [completed, setCompleted] = useState(0);
-  const [weight, setWeight] = useState(30);
-  const [seconds, setSeconds] = useState(0);
-  const [running, setRunning] = useState(false);
+  const [seconds, setSeconds] = useState(Math.max(exercise.rest || 120, 1));
+  const [paused, setPaused] = useState(false);
+
+  const currentSet = Math.min(completed + 1, exercise.sets);
+  const isComplete = completed >= exercise.sets;
+  const timer = `${Math.floor(seconds / 60).toString().padStart(2, "0")}:${(seconds % 60).toString().padStart(2, "0")}`;
+  const progress = useMemo(() => `${currentSet}/${exercise.sets}`, [currentSet, exercise.sets]);
 
   useEffect(() => {
-    if (!running || seconds <= 0) {
-      if (seconds === 0) setRunning(false);
-      return;
-    }
-    const id = window.setInterval(() => setSeconds((value) => Math.max(0, value - 1)), 1000);
+    if (paused || isComplete || seconds <= 0) return;
+    const id = window.setInterval(() => {
+      setSeconds(value => Math.max(0, value - 1));
+    }, 1000);
     return () => window.clearInterval(id);
-  }, [running, seconds]);
+  }, [paused, isComplete, seconds]);
 
-  const timer = `${Math.floor(seconds / 60).toString().padStart(2, "0")}:${(seconds % 60).toString().padStart(2, "0")}`;
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    video.loop = true;
+    video.muted = true;
+    if (!paused && !isComplete) video.play().catch(() => undefined);
+    else video.pause();
+  }, [paused, isComplete, exercise.mediaUrl]);
 
-  function completeSet() {
-    setCompleted((value) => Math.min(exercise.sets, value + 1));
-    setSeconds(exercise.rest);
-    setRunning(true);
+  function togglePause() {
+    setPaused(value => !value);
+  }
+
+  function nextSet() {
+    if (isComplete) return;
+    const nextCompleted = completed + 1;
+    setCompleted(nextCompleted);
+    if (nextCompleted < exercise.sets) {
+      setSeconds(Math.max(exercise.rest || 120, 1));
+      setPaused(false);
+    }
   }
 
   return (
-    <main className="min-h-screen bg-[#070908] px-5 py-6 text-white md:px-10">
-      <div className="mx-auto max-w-5xl">
-        <div className="mb-6 flex items-center justify-between">
-          <Link href="/workout" className="text-sm text-white/60 hover:text-white">← Workout</Link>
-          <span className="text-xs font-semibold tracking-[0.2em] text-lime-300">EXERCISE PLAYER</span>
+    <main className="min-h-screen bg-[#050706] text-white">
+      <section className="relative mx-auto min-h-screen w-full max-w-[430px] overflow-hidden bg-black">
+        <div className="absolute inset-0">
+          {exercise.mediaUrl ? (
+            exercise.mediaType === "IMAGE" || exercise.mediaType === "GIF" ? (
+              <img src={exercise.mediaUrl} alt={exercise.name} className="h-full w-full object-contain bg-black" />
+            ) : (
+              <video
+                ref={videoRef}
+                src={exercise.mediaUrl}
+                playsInline
+                muted
+                loop
+                autoPlay
+                className="h-full w-full object-contain bg-black"
+              />
+            )
+          ) : (
+            <div className="flex h-full items-center justify-center bg-[#111] text-center text-white/50">
+              <div><div className="text-5xl">▶</div><p className="mt-3 text-sm">Nessun video disponibile</p></div>
+            </div>
+          )}
+          <div className="absolute inset-0 bg-gradient-to-b from-black/35 via-transparent to-black/75" />
         </div>
-        <section className="overflow-hidden rounded-[32px] border border-white/10 bg-white/[0.04]">
-          {/* Exercise media keeps its original portrait format. We never crop 9:16 videos. */}
-          <div className="flex w-full justify-center overflow-hidden bg-black/40">
-            <div className="relative aspect-[9/16] w-full max-w-[430px] overflow-hidden bg-black">
-              {exercise.mediaUrl ? (
-                exercise.mediaType === "IMAGE" || exercise.mediaType === "GIF" ? (
-                  <img src={exercise.mediaUrl} alt={exercise.name} className="h-full w-full object-contain" />
-                ) : (
-                  <video src={exercise.mediaUrl} controls playsInline className="h-full w-full object-contain" />
-                )
-              ) : (
-                <div className="flex h-full items-center justify-center text-center">
-                  <div>
-                    <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full border border-lime-300/30 bg-lime-300/10 text-2xl">▶</div>
-                    <p className="font-semibold">GIF / VIDEO</p>
-                    <p className="mt-1 text-sm text-white/40">Exercise media will be managed from Admin</p>
-                  </div>
-                </div>
-              )}
+
+        <header className="absolute inset-x-0 top-0 z-10 flex items-center justify-between p-4">
+          <Link href="/workout" aria-label="Torna alla lista workout" className="flex h-10 w-10 items-center justify-center rounded-full bg-black/45 backdrop-blur-md">
+            ←
+          </Link>
+          <div className="rounded-full bg-black/40 px-3 py-2 text-xs font-bold backdrop-blur-md">{exercise.name}</div>
+          <span className="w-10" />
+        </header>
+
+        <div className="absolute inset-x-0 bottom-0 z-10 p-4 pb-5">
+          <div className="rounded-[28px] bg-[#12201e]/95 p-5 shadow-2xl backdrop-blur-xl">
+            <div className="text-center">
+              <p className="text-[10px] font-medium text-white/45">TIME</p>
+              <p className="mt-1 text-[42px] font-light leading-none tabular-nums tracking-tight">{timer}</p>
+              <p className="mt-2 text-xs font-semibold text-white/60">{progress} · {exercise.reps} reps</p>
             </div>
-          </div>
-          <div className="grid gap-8 p-6 md:grid-cols-[1fr_320px] md:p-8">
-            <div>
-              <p className="mb-2 text-xs font-semibold tracking-[0.2em] text-lime-300">{exercise.muscle}</p>
-              <h1 className="text-4xl font-bold tracking-tight md:text-5xl">{exercise.name}</h1>
-              <div className="mt-7 grid grid-cols-3 gap-3">
-                <Stat label="SETS" value={`${completed}/${exercise.sets}`} />
-                <Stat label="REPS" value={exercise.reps} />
-                <Stat label="REST" value={`${exercise.rest}s`} />
-              </div>
-              <div className="mt-8">
-                <h2 className="text-lg font-semibold">Technique</h2>
-                <ul className="mt-3 space-y-3 text-sm text-white/65">{exercise.instructions.map((item) => <li key={item}>• {item}</li>)}</ul>
-              </div>
-              {exercise.cues.length > 0 && <div className="mt-7 flex flex-wrap gap-2">{exercise.cues.map((cue) => <span key={cue} className="rounded-full border border-white/10 px-3 py-2 text-xs text-white/55">{cue}</span>)}</div>}
+
+            <div className="mt-5 h-1.5 overflow-hidden rounded-full bg-white/10">
+              <div className="h-full rounded-full bg-lime-300 transition-all" style={{ width: `${(completed / exercise.sets) * 100}%` }} />
             </div>
-            <aside className="rounded-3xl bg-black/30 p-5">
-              <p className="text-xs font-semibold tracking-[0.18em] text-white/40">WORKING WEIGHT</p>
-              <div className="mt-4 flex items-center justify-between gap-3">
-                <button onClick={() => setWeight((v) => Math.max(0, v - 2.5))} className="h-11 w-11 rounded-full border border-white/10">−</button>
-                <div className="text-center"><strong className="text-3xl">{weight}</strong><span className="ml-1 text-white/40">kg</span></div>
-                <button onClick={() => setWeight((v) => v + 2.5)} className="h-11 w-11 rounded-full border border-white/10">+</button>
-              </div>
-              <div className="mt-6 rounded-2xl border border-white/10 p-4 text-center">
-                <p className="text-xs text-white/40">RECOVERY</p>
-                <p className="mt-1 text-3xl font-bold tabular-nums">{timer}</p>
-                <button onClick={() => setRunning((v) => !v)} className="mt-3 text-sm font-semibold text-lime-300">{running ? "PAUSE" : "START TIMER"}</button>
-              </div>
-              <button onClick={completeSet} disabled={completed >= exercise.sets} className="mt-4 w-full rounded-2xl bg-lime-300 px-5 py-4 font-bold text-black disabled:cursor-not-allowed disabled:opacity-40">{completed >= exercise.sets ? "EXERCISE COMPLETE" : `COMPLETE SET ${completed + 1}`}</button>
-            </aside>
+
+            <div className="mt-4 flex items-center justify-center gap-3">
+              <button type="button" onClick={togglePause} className="rounded-full border border-white/15 bg-white/5 px-5 py-2.5 text-xs font-bold">
+                {paused ? "▶ Riprendi" : "Ⅱ Pausa"}
+              </button>
+              <button type="button" onClick={() => setSeconds(Math.max(exercise.rest || 120, 1))} className="rounded-full border border-white/15 bg-white/5 px-5 py-2.5 text-xs font-bold">
+                Reset
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={nextSet}
+              disabled={isComplete}
+              className="mt-4 w-full rounded-xl bg-lime-300 py-4 text-sm font-black text-black transition active:scale-[.99] disabled:opacity-40"
+            >
+              {isComplete ? "ESERCIZIO COMPLETATO" : "Next"}
+            </button>
           </div>
-        </section>
-      </div>
+        </div>
+      </section>
     </main>
   );
-}
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4"><p className="text-[10px] font-semibold tracking-[0.16em] text-white/35">{label}</p><p className="mt-1 font-bold">{value}</p></div>;
 }

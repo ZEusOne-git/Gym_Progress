@@ -1,14 +1,20 @@
 import { notFound } from "next/navigation";
 import ExercisePlayer from "@/components/workout/ExercisePlayer";
-import { prisma } from "@/lib/db";
+import { prisma } from "@/lib/prisma";
 
 type PageProps = { params: Promise<{ exercise: string }> };
 
 export default async function ExercisePage({ params }: PageProps) {
   const { exercise: slug } = await params;
-  const exercise = await prisma.exercise.findUnique({
+
+  const exercise = await prisma.exercise.findFirst({
     where: { slug, isActive: true },
-    include: { media: { where: { isActive: true, isPrimary: true }, take: 1 } },
+    include: {
+      media: {
+        where: { isActive: true },
+        orderBy: [{ isPrimary: "desc" }, { createdAt: "desc" }],
+      },
+    },
   });
 
   if (!exercise) notFound();

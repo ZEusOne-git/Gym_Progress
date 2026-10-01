@@ -48,20 +48,25 @@ export default function ExercisePlayer({ exercise }: Props) {
           <span className="text-xs font-semibold tracking-[0.2em] text-lime-300">EXERCISE PLAYER</span>
         </div>
         <section className="overflow-hidden rounded-[32px] border border-white/10 bg-white/[0.04]">
-          <div className="flex aspect-video items-center justify-center overflow-hidden bg-black/40 text-center">
-            {exercise.mediaUrl ? (
-              exercise.mediaType === "IMAGE" || exercise.mediaType === "GIF" ? (
-                <img src={exercise.mediaUrl} alt={exercise.name} className="h-full w-full object-cover" />
+          {/* Exercise media keeps its original portrait format. We never crop 9:16 videos. */}
+          <div className="flex w-full justify-center overflow-hidden bg-black/40">
+            <div className="relative aspect-[9/16] w-full max-w-[430px] overflow-hidden bg-black">
+              {exercise.mediaUrl ? (
+                exercise.mediaType === "IMAGE" || exercise.mediaType === "GIF" ? (
+                  <img src={exercise.mediaUrl} alt={exercise.name} className="h-full w-full object-contain" />
+                ) : (
+                  <video src={exercise.mediaUrl} controls playsInline className="h-full w-full object-contain" />
+                )
               ) : (
-                <video src={exercise.mediaUrl} controls playsInline className="h-full w-full object-cover" />
-              )
-            ) : (
-              <div>
-                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full border border-lime-300/30 bg-lime-300/10 text-2xl">▶</div>
-                <p className="font-semibold">GIF / VIDEO</p>
-                <p className="mt-1 text-sm text-white/40">Exercise media will be managed from Admin</p>
-              </div>
-            )}
+                <div className="flex h-full items-center justify-center text-center">
+                  <div>
+                    <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full border border-lime-300/30 bg-lime-300/10 text-2xl">▶</div>
+                    <p className="font-semibold">GIF / VIDEO</p>
+                    <p className="mt-1 text-sm text-white/40">Exercise media will be managed from Admin</p>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
           <div className="grid gap-8 p-6 md:grid-cols-[1fr_320px] md:p-8">
             <div>

@@ -9,21 +9,13 @@
   --border: rgba(255, 255, 255, 0.09);
   --accent: #c8ff3d;
   --accent-foreground: #0a1007;
+  --dark-button: #0b0f0d;
+  --dark-button-foreground: #ffffff;
 }
 
-* {
-  box-sizing: border-box;
-}
-
-html,
-body {
-  min-height: 100%;
-}
-
-html {
-  background: var(--background);
-}
-
+* { box-sizing: border-box; }
+html, body { min-height: 100%; }
+html { background: var(--background); }
 body {
   margin: 0;
   min-height: 100vh;
@@ -33,24 +25,24 @@ body {
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
+button, input, select, textarea { font: inherit; }
+button { cursor: pointer; }
+a { color: inherit; text-decoration: none; }
+::selection { background: var(--accent); color: var(--accent-foreground); }
 
-button,
-input,
-select,
-textarea {
-  font: inherit;
-}
-
-button {
-  cursor: pointer;
-}
-
-a {
-  color: inherit;
-  text-decoration: none;
-}
-
-::selection {
+/* Shared contrast-safe button primitives. Use these instead of pairing arbitrary
+   background/text utilities so the label always remains readable. */
+.btn-accent {
   background: var(--accent);
   color: var(--accent-foreground);
 }
+.btn-dark {
+  background: var(--dark-button);
+  color: var(--dark-button-foreground);
+}
+.btn-surface {
+  background: var(--surface-strong);
+  color: var(--foreground);
+}
+.btn-accent:hover, .btn-dark:hover, .btn-surface:hover { filter: brightness(1.06); }
+.btn-accent:disabled, .btn-dark:disabled, .btn-surface:disabled { cursor: not-allowed; opacity: .5; filter: none; }

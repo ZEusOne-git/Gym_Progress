@@ -9,12 +9,27 @@ async function requireAdmin() {
 }
 
 export async function GET() {
-  const user = await requireAdmin();
-  if (!user) return NextResponse.json({ error: "Non autorizzato" }, { status: 403 });
+  const admin = await requireAdmin();
+  if (!admin) return NextResponse.json({ error: "Non autorizzato" }, { status: 403 });
+
   const users = await prisma.user.findMany({
     where: { role: "USER" },
-    orderBy: [{ profile: { firstName: "asc" } }, { email: "asc" }],
-    select: { id: true, email: true, profile: { select: { firstName: true } } },
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      email: true,
+      createdAt: true,
+      profile: { select: { firstName: true, age: true, currentWeight: true, targetWeight: true } },
+      onboarding: { select: { primaryGoal: true, completedAt: true } },
+      plans: {
+        where: { isActive: true },
+        orderBy: { updatedAt: "desc" },
+        take: 1,
+        select: { id: true, name: true, updatedAt: true, templates: { select: { id: true } } },
+      },
+      _count: { select: { sessionsLog: true } },
+    },
   });
-  return NextResponse.json(users);
+
+  return NextResponse.json({ users });
 }

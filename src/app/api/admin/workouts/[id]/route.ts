@@ -12,22 +12,39 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
   const user = await requireAdmin();
   if (!user) return NextResponse.json({ error: "Non autorizzato" }, { status: 403 });
   const { id } = await params;
-  const plan = await prisma.workoutPlan.findFirst({
-    where: { id, isTemplate: true },
-    include: {
-      templates: {
-        orderBy: { dayNumber: "asc" },
-        include: {
-          exercises: {
-            orderBy: { orderIndex: "asc" },
-            include: { exercise: { select: { id: true, name: true, primaryMuscles: true, difficulty: true } } },
-          },
-        },
-      },
-    },
-  });
+  const plan = await prisma.workoutPlan.findFirst({ where: { id, isTemplate: true }, include: { templates: { orderBy: { dayNumber: "asc" }, include: { exercises: { orderBy: { orderIndex: "asc" }, include: { exercise: { select: { id: true, name: true, primaryMuscles: true, difficulty: true } } } } } } } });
   if (!plan) return NextResponse.json({ error: "Programma non trovato" }, { status: 404 });
   return NextResponse.json(plan);
+}
+
+async function savePlan(id: string, body: any) {
+  const name = typeof body?.name === "string" ? body.name.trim() : "";
+  const days = Array.isArray(body?.days) ? body.days : [];
+  if (!name) throw new Error("Inserisci il nome del programma.");
+  if (!days.length) throw new Error("Il programma deve contenere almeno un giorno.");
+  const exerciseIds = Array.from(new Set(days.flatMap((d: any) => Array.isArray(d?.exercises) ? d.exercises.map((x: any) => x?.exerciseId).filter(Boolean) : []))) as string[];
+  const valid = await prisma.exercise.findMany({ where: { id: { in: exerciseIds }, isActive: true }, select: { id: true } });
+  if (valid.length !== exerciseIds.length) throw new Error("Uno o più esercizi non sono più disponibili nella Library.");
+  return prisma.$transaction(async tx => {
+    await tx.workoutPlan.update({ where: { id }, data: { name } });
+    await tx.workoutTemplate.deleteMany({ where: { workoutPlanId: id } });
+    for (let di = 0; di < days.length; di++) {
+      const day = days[di] ?? {};
+      const template = await tx.workoutTemplate.create({ data: { workoutPlanId: id, dayNumber: di + 1, name: typeof day.name === "string" && day.name.trim() ? day.name.trim() : `Day ${di + 1}`, estimatedMins: Number(day.estimatedMins) > 0 ? Math.round(Number(day.estimatedMins)) : null } });
+      const items = Array.isArray(day.exercises) ? day.exercises : [];
+      if (items.length) await tx.workoutExercise.createMany({ data: items.map((item: any, i: number) => { const repMin = Math.max(1, Number(item.repMin) || 1); return { templateId: template.id, exerciseId: item.exerciseId, orderIndex: i, sets: Math.max(1, Number(item.sets) || 1), repMin, repMax: Math.max(repMin, Number(item.repMax) || repMin), rirTarget: item.rirTarget === "" || item.rirTarget == null ? null : Number(item.rirTarget), restSeconds: Math.max(0, Number(item.restSeconds) || 0), setType: typeof item.setType === "string" ? item.setType : "NORMAL", progressionType: typeof item.progressionType === "string" ? item.progressionType : "DOUBLE_PROGRESSION", loadIncrement: item.loadIncrement === "" || item.loadIncrement == null ? null : Number(item.loadIncrement), tempo: typeof item.tempo === "string" && item.tempo.trim() ? item.tempo.trim() : null, targetWeight: item.targetWeight === "" || item.targetWeight == null ? null : Number(item.targetWeight), notes: typeof item.notes === "string" && item.notes.trim() ? item.notes.trim() : null }; }) });
+    }
+    return tx.workoutPlan.findUnique({ where: { id }, include: { templates: { orderBy: { dayNumber: "asc" }, include: { exercises: { orderBy: { orderIndex: "asc" } } } } } });
+  });
+}
+
+export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const user = await requireAdmin();
+  if (!user) return NextResponse.json({ error: "Non autorizzato" }, { status: 403 });
+  const { id } = await params;
+  const exists = await prisma.workoutPlan.findFirst({ where: { id, isTemplate: true }, select: { id: true } });
+  if (!exists) return NextResponse.json({ error: "Programma non trovato" }, { status: 404 });
+  try { return NextResponse.json(await savePlan(id, await request.json())); } catch (error) { const message = error instanceof Error ? error.message : "Impossibile aggiornare il programma."; return NextResponse.json({ error: message }, { status: 400 }); }
 }
 
 export async function DELETE(_: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -44,23 +61,17 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const user = await requireAdmin();
   if (!user) return NextResponse.json({ error: "Non autorizzato" }, { status: 403 });
   const { id } = await params;
-  const source = await prisma.workoutPlan.findFirst({
-    where: { id, isTemplate: true },
-    include: { templates: { orderBy: { dayNumber: "asc" }, include: { exercises: { orderBy: { orderIndex: "asc" } } } } },
-  });
+  const source = await prisma.workoutPlan.findFirst({ where: { id, isTemplate: true }, include: { templates: { orderBy: { dayNumber: "asc" }, include: { exercises: { orderBy: { orderIndex: "asc" } } } } } });
   if (!source) return NextResponse.json({ error: "Programma non trovato" }, { status: 404 });
-  let requestedName = "";
-  try { const body = await request.json(); requestedName = typeof body?.name === "string" ? body.name.trim() : ""; } catch {}
+  let requestedName = ""; try { const body = await request.json(); requestedName = typeof body?.name === "string" ? body.name.trim() : ""; } catch {}
   const name = requestedName || `${source.name} · Copia`;
   const copy = await prisma.$transaction(async tx => {
     const created = await tx.workoutPlan.create({ data: { userId: null, name, isTemplate: true } });
     for (const day of source.templates) {
       const template = await tx.workoutTemplate.create({ data: { workoutPlanId: created.id, dayNumber: day.dayNumber, name: day.name, estimatedMins: day.estimatedMins } });
-      if (day.exercises.length) {
-        await tx.workoutExercise.createMany({ data: day.exercises.map(item => ({ templateId: template.id, exerciseId: item.exerciseId, orderIndex: item.orderIndex, sets: item.sets, repMin: item.repMin, repMax: item.repMax, rirTarget: item.rirTarget, restSeconds: item.restSeconds, setType: item.setType, progressionType: item.progressionType, loadIncrement: item.loadIncrement, tempo: item.tempo, targetWeight: item.targetWeight, notes: item.notes })) });
-      }
+      if (day.exercises.length) await tx.workoutExercise.createMany({ data: day.exercises.map(item => ({ templateId: template.id, exerciseId: item.exerciseId, orderIndex: item.orderIndex, sets: item.sets, repMin: item.repMin, repMax: item.repMax, rirTarget: item.rirTarget, restSeconds: item.restSeconds, setType: item.setType, progressionType: item.progressionType, loadIncrement: item.loadIncrement, tempo: item.tempo, targetWeight: item.targetWeight, notes: item.notes })) });
     }
-    return tx.workoutPlan.findUnique({ where: { id: created.id }, include: { templates: { orderBy: { dayNumber: "asc" }, include: { exercises: true } } } });
+    return tx.workoutPlan.findUnique({ where: { id: created.id }, select: { id: true, name: true } });
   });
   return NextResponse.json(copy, { status: 201 });
 }

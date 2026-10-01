@@ -13,8 +13,8 @@ export async function GET(request: Request) {
   const m = Number.isInteger(month) && month >= 0 && month <= 11 ? month : now.getMonth();
   const from = new Date(y, m, 1); const to = new Date(y, m + 1, 1);
   const plan = await prisma.workoutPlan.findFirst({ where: { userId: user.id, isActive: true, isTemplate: false }, orderBy: { updatedAt: "desc" }, select: { id: true, name: true, templates: { orderBy: { dayNumber: "asc" }, select: { id: true, dayNumber: true, name: true, estimatedMins: true, exercises: { orderBy: { orderIndex: "asc" }, select: { id: true, sets: true, repMin: true, repMax: true, exercise: { select: { name: true } } } } } } } });
+  const schedules = plan ? await prisma.workoutSchedule.findMany({ where: { userId: user.id, workoutPlanId: plan.id, scheduledDate: { gte: from, lt: to } }, orderBy: { scheduledDate: "asc" }, select: { id: true, scheduledDate: true, templateId: true, template: { select: { id: true, dayNumber: true, name: true, estimatedMins: true, exercises: { orderBy: { orderIndex: "asc" }, select: { id: true, sets: true, repMin: true, repMax: true, exercise: { select: { name: true } } } } } }, session: { select: { id: true, startedAt: true, completedAt: true } } } }) : [];
   const sessions = plan ? await prisma.workoutSession.findMany({ where: { userId: user.id, workoutPlanId: plan.id, startedAt: { gte: from, lt: to } }, orderBy: { startedAt: "asc" }, select: { id: true, startedAt: true, completedAt: true } }) : [];
-  const completedAll = plan ? await prisma.workoutSession.count({ where: { userId: user.id, workoutPlanId: plan.id, completedAt: { not: null } } }) : 0;
-  const nextTemplate = plan?.templates.length ? plan.templates[completedAll % plan.templates.length] : null;
-  return NextResponse.json({ plan, sessions, nextTemplate });
+  const nextSchedule = plan ? await prisma.workoutSchedule.findFirst({ where: { userId: user.id, workoutPlanId: plan.id, scheduledDate: { gte: new Date(y, m, now.getDate()) }, session: { none: { completedAt: { not: null } } } }, orderBy: { scheduledDate: "asc" }, select: { id: true, scheduledDate: true, template: { select: { id: true, dayNumber: true, name: true, estimatedMins: true, exercises: { select: { id: true } } } } } }) : null;
+  return NextResponse.json({ plan, schedules, sessions, nextSchedule });
 }

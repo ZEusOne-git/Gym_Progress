@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { ArrowLeft, ArrowRight, Check, Dumbbell, Target, UserRound, CalendarDays, HeartPulse, Ruler, Sparkles } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 const steps = [
   { title: "About you", icon: UserRound },
@@ -23,22 +23,99 @@ const goals = [
 
 const priorities = ["Arms", "Shoulders", "Chest", "Back", "Abs", "Glutes", "Quads", "Hamstrings", "Calves", "Lower back"];
 
+type FormState = {
+  name: string;
+  age: string;
+  sex: string;
+  weight: string;
+  height: string;
+  goal: string;
+  experience: string;
+  days: string;
+  priorities: string[];
+  running: string;
+  notes: string;
+};
+
+const emptyForm: FormState = { name: "", age: "", sex: "", weight: "", height: "", goal: "", experience: "", days: "4", priorities: [], running: "", notes: "" };
+
 export default function OnboardingPage() {
   const [step, setStep] = useState(0);
-  const [form, setForm] = useState({ name: "", age: "", sex: "", weight: "", height: "", goal: "", experience: "", days: "4", priorities: [] as string[], running: "", notes: "" });
+  const [form, setForm] = useState<FormState>(emptyForm);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
   const progress = useMemo(() => ((step + 1) / steps.length) * 100, [step]);
   const StepIcon = steps[step].icon;
 
-  const update = (key: string, value: string) => setForm((current) => ({ ...current, [key]: value }));
+  useEffect(() => {
+    let active = true;
+    fetch("/api/onboarding", { cache: "no-store" })
+      .then(async (response) => {
+        if (response.status === 401) {
+          window.location.href = "/login?next=/onboarding";
+          return null;
+        }
+        if (!response.ok) throw new Error("Unable to load your profile.");
+        return response.json();
+      })
+      .then((data) => {
+        if (!active || !data) return;
+        if (data.completed) {
+          window.location.href = "/dashboard";
+          return;
+        }
+        const profile = data.profile ?? {};
+        const onboarding = data.onboarding ?? {};
+        let prioritiesFromDb: string[] = [];
+        try {
+          const stored = JSON.parse(onboarding.musclePrioritiesJson ?? "[]");
+          prioritiesFromDb = Array.isArray(stored) ? stored.map((item: string) => item.replace("LOWER_BACK", "Lower back").replace("SHOULDERS", "Shoulders").replace("CHEST", "Chest").replace("BACK", "Back").replace("ABS", "Abs").replace("GLUTES", "Glutes").replace("QUADS", "Quads").replace("HAMSTRINGS", "Hamstrings").replace("CALVES", "Calves")) : [];
+        } catch { prioritiesFromDb = []; }
+        let preferences: { cardio?: string; trainingStyle?: string } = {};
+        try { preferences = JSON.parse(onboarding.preferencesJson ?? "{}"); } catch { preferences = {}; }
+        const goalReverse: Record<string, string> = { RECOMPOSITION: "RECOMP", FAT_LOSS: "FAT LOSS", MUSCLE_GAIN: "MUSCLE", STRENGTH: "STRENGTH" };
+        setForm({
+          name: profile.firstName ?? "",
+          age: profile.age?.toString() ?? "",
+          sex: profile.sex ?? "",
+          weight: profile.currentWeight?.toString() ?? "",
+          height: profile.heightCm?.toString() ?? "",
+          goal: goalReverse[onboarding.primaryGoal] ?? "",
+          experience: profile.experience ?? "",
+          days: profile.trainingDays?.toString() ?? "4",
+          priorities: prioritiesFromDb.filter((item) => priorities.includes(item)),
+          running: preferences.cardio ?? "",
+          notes: preferences.trainingStyle ?? "",
+        });
+      })
+      .catch((cause) => { if (active) setError(cause instanceof Error ? cause.message : "Unable to load your profile."); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, []);
+
+  const update = (key: keyof FormState, value: string) => setForm((current) => ({ ...current, [key]: value }));
   const togglePriority = (value: string) => setForm((current) => ({ ...current, priorities: current.priorities.includes(value) ? current.priorities.filter((item) => item !== value) : [...current.priorities, value] }));
 
-  const next = () => {
-    if (step < steps.length - 1) setStep((current) => current + 1);
-    else {
-      sessionStorage.setItem("gym-progress-onboarding", JSON.stringify(form));
-      window.location.href = "/dashboard";
+  const save = async (completed = false) => {
+    setSaving(true);
+    setError("");
+    try {
+      const response = await fetch("/api/onboarding", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...form, completed }) });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error ?? "Unable to save your progress.");
+      if (completed) window.location.href = "/dashboard";
+      else setStep((current) => current + 1);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Unable to save your progress.");
+    } finally {
+      setSaving(false);
     }
   };
+
+  const next = () => save(step === steps.length - 1);
+
+  if (loading) return <main className="flex min-h-screen items-center justify-center px-5"><p className="text-sm font-bold text-[var(--muted)]">LOADING YOUR PROFILE...</p></main>;
 
   return (
     <main className="min-h-screen">
@@ -66,9 +143,10 @@ export default function OnboardingPage() {
             {step === 5 && <div className="grid grid-cols-2 gap-3">{priorities.map((item) => <button key={item} onClick={() => togglePriority(item)} className={`rounded-2xl border px-4 py-4 text-left text-sm font-bold transition ${form.priorities.includes(item) ? "border-[var(--accent)] bg-[var(--accent)] text-[var(--accent-foreground)]" : "border-[var(--border)] bg-[var(--surface)]"}`}><span className="mr-2 inline-flex h-5 w-5 items-center justify-center rounded-full border border-current">{form.priorities.includes(item) && <Check size={13} />}</span>{item}</button>)}</div>}
             {step === 6 && <><Choice label="How do you prefer to train?" options={["Mostly machines", "Free weights", "A mix of everything"]} value={form.notes} onChange={(value) => update("notes", value)} /><div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4"><p className="text-sm font-bold">Your setup</p><p className="mt-2 text-sm leading-6 text-[var(--muted)]">We&apos;ll assume access to a commercial gym, barbells, machines and a free-weight area. You can change equipment later.</p></div></>}
           </div>
+          {error && <div className="mt-4 rounded-2xl border border-red-400/30 bg-red-400/10 px-4 py-3 text-sm font-semibold text-red-300">{error}</div>}
         </section>
 
-        <button onClick={next} className="mt-8 flex w-full items-center justify-center gap-2 rounded-2xl bg-[var(--accent)] px-5 py-4 font-black text-[var(--accent-foreground)]">{step === steps.length - 1 ? "BUILD MY PLAN" : "CONTINUE"}<ArrowRight size={18} /></button>
+        <button disabled={saving} onClick={next} className="mt-8 flex w-full items-center justify-center gap-2 rounded-2xl bg-[var(--accent)] px-5 py-4 font-black text-[var(--accent-foreground)] disabled:cursor-not-allowed disabled:opacity-60">{saving ? "SAVING..." : step === steps.length - 1 ? "BUILD MY PLAN" : "CONTINUE"}<ArrowRight size={18} /></button>
       </div>
     </main>
   );

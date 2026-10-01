@@ -7,7 +7,7 @@ async function requireAdmin() { const user = await getCurrentUser(); if (!user |
 export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await requireAdmin(); if (!user) return NextResponse.json({ error: "Non autorizzato" }, { status: 403 });
   const { id } = await params;
-  const plan = await prisma.workoutPlan.findFirst({ where: { id, isTemplate: true }, include: { templates: { orderBy: { dayNumber: "asc" }, include: { exercises: { orderBy: { orderIndex: "asc" }, include: { exercise: { select: { id: true, name: true, primaryMuscles: true, difficulty: true } } } } } } } });
+  const plan = await prisma.workoutPlan.findFirst({ where: { id, isTemplate: true }, include: { user: { select: { id: true, email: true, profile: { select: { firstName: true } } } }, templates: { orderBy: { dayNumber: "asc" }, include: { exercises: { orderBy: { orderIndex: "asc" }, include: { exercise: { select: { id: true, name: true, primaryMuscles: true, difficulty: true } } } } } } } });
   if (!plan) return NextResponse.json({ error: "Programma non trovato" }, { status: 404 }); return NextResponse.json(plan);
 }
 

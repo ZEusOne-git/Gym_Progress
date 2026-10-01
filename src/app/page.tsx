@@ -1,75 +1,40 @@
-const focus = [
-  { label: "Shoulders", value: 82 },
-  { label: "Arms", value: 72 },
-  { label: "Glutes", value: 64 },
-  { label: "Abs", value: 76 },
-];
+import Link from "next/link";
+import { ArrowRight, Check, Dumbbell, Play } from "lucide-react";
+
+const features = ["Personalized workouts", "Exercise guidance", "Progressive overload tracking"];
 
 export default function Home() {
   return (
-    <main className="mx-auto min-h-screen w-full max-w-md px-5 pb-28 pt-8">
-      <header className="mb-7 flex items-start justify-between">
-        <div>
-          <p className="mb-1 text-sm text-[var(--muted)]">Good morning 👋</p>
-          <h1 className="text-3xl font-bold tracking-tight">Ready to train?</h1>
-        </div>
-        <button aria-label="Notifications" className="rounded-full bg-[var(--surface)] p-3">🔔</button>
-      </header>
-
-      <section className="rounded-[28px] bg-[var(--surface)] p-5 shadow-2xl shadow-black/20">
-        <div className="mb-5 flex items-center justify-between">
-          <span className="rounded-full bg-[var(--accent)] px-3 py-1 text-xs font-bold text-[var(--accent-foreground)]">TODAY</span>
-          <span className="text-xs text-[var(--muted)]">~60 min</span>
-        </div>
-        <p className="text-sm text-[var(--muted)]">Day 1</p>
-        <h2 className="mt-1 text-2xl font-bold">Shoulders + Arms + Abs</h2>
-        <p className="mt-2 text-sm text-[var(--muted)]">7 exercises · Personalized for you</p>
-        <button className="mt-6 w-full rounded-2xl bg-[var(--accent)] px-5 py-4 font-bold text-[var(--accent-foreground)] transition-transform active:scale-[.98]">
-          START WORKOUT
-        </button>
-      </section>
-
-      <section className="mt-6 rounded-[28px] bg-[var(--surface)] p-5">
-        <div className="flex items-end justify-between">
-          <div>
-            <p className="text-sm text-[var(--muted)]">Current weight</p>
-            <p className="mt-1 text-3xl font-bold">90.0 kg</p>
+    <main className="min-h-screen overflow-hidden">
+      <div className="mx-auto flex min-h-screen w-full max-w-md flex-col px-5 pb-8 pt-7">
+        <header className="flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--accent)] text-sm font-black text-[var(--accent-foreground)]">GP</div>
+            <span className="font-black tracking-tight">GYM PROGRESS</span>
           </div>
-          <span className="rounded-full bg-[var(--surface-2)] px-3 py-2 text-sm font-semibold">↓ 2.5 kg</span>
-        </div>
-        <div className="mt-5 h-2 overflow-hidden rounded-full bg-[var(--surface-2)]">
-          <div className="h-full w-[55%] rounded-full bg-[var(--accent)]" />
-        </div>
-        <div className="mt-2 flex justify-between text-xs text-[var(--muted)]">
-          <span>90 kg</span><span>Goal 84–85 kg</span>
-        </div>
-      </section>
+          <Link href="/login" className="text-sm font-semibold text-[var(--muted)]">Login</Link>
+        </header>
 
-      <section className="mt-6">
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-lg font-bold">Your focus</h2>
-          <span className="text-xs text-[var(--muted)]">Priority muscles</span>
-        </div>
-        <div className="space-y-3 rounded-[28px] bg-[var(--surface)] p-5">
-          {focus.map((item) => (
-            <div key={item.label}>
-              <div className="mb-1.5 flex justify-between text-sm">
-                <span>{item.label}</span><span className="text-[var(--muted)]">{item.value}%</span>
-              </div>
-              <div className="h-2 rounded-full bg-[var(--surface-2)]">
-                <div className="h-full rounded-full bg-[var(--accent)]" style={{ width: `${item.value}%` }} />
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
+        <section className="flex flex-1 flex-col justify-center py-16">
+          <div className="mb-6 inline-flex w-fit items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-xs font-bold tracking-wide text-[var(--accent)]"><span className="h-1.5 w-1.5 rounded-full bg-[var(--accent)]" /> PERSONALIZED TRAINING</div>
+          <h1 className="text-5xl font-black leading-[.95] tracking-[-0.045em]">Build your<br /><span className="text-[var(--accent)]">stronger</span> version.</h1>
+          <p className="mt-6 max-w-sm text-base leading-7 text-[var(--muted)]">Tell us how you train, what you want to improve, and how much time you have. Gym Progress builds the plan around you.</p>
 
-      <nav className="fixed bottom-0 left-1/2 z-10 flex w-full max-w-md -translate-x-1/2 justify-around border-t border-[var(--border)] bg-[rgba(7,22,21,.96)] px-4 py-4 backdrop-blur-xl">
-        <button className="text-sm font-semibold text-[var(--accent)]">⌂<span className="sr-only">Home</span></button>
-        <button className="text-sm text-[var(--muted)]">▣<span className="sr-only">Workout</span></button>
-        <button className="text-sm text-[var(--muted)]">⌁<span className="sr-only">Progress</span></button>
-        <button className="text-sm text-[var(--muted)]">○<span className="sr-only">Profile</span></button>
-      </nav>
+          <div className="mt-8 space-y-3">
+            {features.map((feature) => <div key={feature} className="flex items-center gap-3 text-sm font-semibold"><span className="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--surface-2)] text-[var(--accent)]"><Check size={14} strokeWidth={3} /></span>{feature}</div>)}
+          </div>
+
+          <div className="mt-10 grid grid-cols-2 gap-3">
+            <div className="rounded-3xl bg-[var(--surface)] p-4"><Dumbbell size={20} className="text-[var(--accent)]" /><p className="mt-8 text-2xl font-black">4–6</p><p className="text-xs text-[var(--muted)]">training days</p></div>
+            <div className="rounded-3xl bg-[var(--surface)] p-4"><Play size={20} className="text-[var(--accent)]" /><p className="mt-8 text-2xl font-black">1 app</p><p className="text-xs text-[var(--muted)]">for your progress</p></div>
+          </div>
+        </section>
+
+        <div className="space-y-3">
+          <Link href="/register" className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[var(--accent)] px-5 py-4 font-black text-[var(--accent-foreground)] transition-transform active:scale-[.98]">CREATE YOUR PLAN <ArrowRight size={18} /></Link>
+          <Link href="/login" className="flex w-full items-center justify-center rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-5 py-4 font-bold">I ALREADY HAVE AN ACCOUNT</Link>
+        </div>
+      </div>
     </main>
   );
 }

@@ -1,0 +1,40 @@
+import { PrismaClient } from "@prisma/client";
+
+const prisma = new PrismaClient();
+
+const exercises = [
+  { name: "Barbell Squat", slug: "barbell-squat", category: "LEGS", primaryMuscles: "QUADS · GLUTES", equipment: ["BARBELL", "RACK"], difficulty: "BEGINNER", instructions: ["Brace your core before descending.", "Keep your knees tracking over your toes.", "Drive through the floor and finish tall."], cues: ["Brace before every rep", "Keep your heels planted", "Control the descent"] },
+  { name: "Lat Pulldown", slug: "lat-pulldown", category: "BACK", primaryMuscles: "LATS · BICEPS", equipment: ["CABLE", "MACHINE"], difficulty: "BEGINNER", instructions: ["Keep your chest lifted.", "Pull the bar toward your upper chest.", "Control the return without swinging."], cues: ["Lead with your elbows", "Avoid swinging", "Pause at the bottom"] },
+  { name: "Shoulder Press", slug: "shoulder-press", category: "SHOULDERS", primaryMuscles: "SHOULDERS · TRICEPS", equipment: ["DUMBBELLS"], difficulty: "BEGINNER", instructions: ["Keep your ribs controlled.", "Press vertically without shrugging.", "Lower the weight under control."], cues: ["Keep your core tight", "Do not overextend your back", "Use controlled reps"] },
+  { name: "Cable Curl", slug: "cable-curl", category: "ARMS", primaryMuscles: "BICEPS", equipment: ["CABLE"], difficulty: "BEGINNER", instructions: ["Keep your elbows close to your sides.", "Curl without moving your shoulders.", "Squeeze at the top and lower slowly."], cues: ["Keep elbows fixed", "Squeeze at the top", "Lower slowly"] },
+  { name: "Core Finisher", slug: "core-finisher", category: "CORE", primaryMuscles: "ABS · CORE", equipment: ["BODYWEIGHT"], difficulty: "BEGINNER", instructions: ["Keep your lower back controlled.", "Move slowly through the full range.", "Breathe continuously throughout the set."], cues: ["Control every rep", "Keep your core braced", "Breathe continuously"] },
+];
+
+for (const item of exercises) {
+  await prisma.exercise.upsert({
+    where: { slug: item.slug },
+    update: {
+      name: item.name,
+      category: item.category,
+      primaryMuscles: item.primaryMuscles,
+      equipment: JSON.stringify(item.equipment),
+      difficulty: item.difficulty,
+      instructionsJson: JSON.stringify(item.instructions),
+      cuesJson: JSON.stringify(item.cues),
+      isActive: true,
+    },
+    create: {
+      name: item.name,
+      slug: item.slug,
+      category: item.category,
+      primaryMuscles: item.primaryMuscles,
+      equipment: JSON.stringify(item.equipment),
+      difficulty: item.difficulty,
+      instructionsJson: JSON.stringify(item.instructions),
+      cuesJson: JSON.stringify(item.cues),
+    },
+  });
+}
+
+console.log(`Seeded ${exercises.length} exercises.`);
+await prisma.$disconnect();

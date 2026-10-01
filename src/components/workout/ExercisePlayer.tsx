@@ -1,22 +1,23 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 
-type Props = { exerciseSlug: string };
-
-type Exercise = { name: string; muscle: string; sets: number; reps: string; rest: number; instructions: string[] };
-
-const EXERCISES: Record<string, Exercise> = {
-  "barbell-squat": { name: "Barbell Squat", muscle: "QUADS · GLUTES · LOWER BACK", sets: 3, reps: "8–10", rest: 90, instructions: ["Brace your core before descending.", "Keep your knees tracking over your toes.", "Drive through the floor and finish tall."] },
-  "lat-pulldown": { name: "Lat Pulldown", muscle: "LATS · BICEPS", sets: 3, reps: "10–12", rest: 75, instructions: ["Keep your chest lifted.", "Pull the bar toward your upper chest.", "Control the return without swinging."] },
-  "shoulder-press": { name: "Shoulder Press", muscle: "SHOULDERS · TRICEPS", sets: 3, reps: "8–10", rest: 75, instructions: ["Keep your ribs controlled.", "Press vertically without shrugging.", "Lower the weight under control."] },
-  "cable-curl": { name: "Cable Curl", muscle: "BICEPS", sets: 3, reps: "10–12", rest: 60, instructions: ["Keep your elbows close to your sides.", "Curl without moving your shoulders.", "Squeeze at the top and lower slowly."] },
-  "core-finisher": { name: "Core Finisher", muscle: "ABS · CORE", sets: 3, reps: "12–15", rest: 45, instructions: ["Keep your lower back controlled.", "Move slowly through the full range.", "Breathe continuously throughout the set."] },
+type Exercise = {
+  name: string;
+  muscle: string;
+  sets: number;
+  reps: string;
+  rest: number;
+  instructions: string[];
+  cues: string[];
+  mediaUrl?: string | null;
+  mediaType?: string | null;
 };
 
-export default function ExercisePlayer({ exerciseSlug }: Props) {
-  const exercise = useMemo(() => EXERCISES[exerciseSlug] ?? EXERCISES["barbell-squat"], [exerciseSlug]);
+type Props = { exercise: Exercise };
+
+export default function ExercisePlayer({ exercise }: Props) {
   const [completed, setCompleted] = useState(0);
   const [weight, setWeight] = useState(30);
   const [seconds, setSeconds] = useState(0);
@@ -47,12 +48,20 @@ export default function ExercisePlayer({ exerciseSlug }: Props) {
           <span className="text-xs font-semibold tracking-[0.2em] text-lime-300">EXERCISE PLAYER</span>
         </div>
         <section className="overflow-hidden rounded-[32px] border border-white/10 bg-white/[0.04]">
-          <div className="flex aspect-video items-center justify-center bg-black/40 text-center">
-            <div>
-              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full border border-lime-300/30 bg-lime-300/10 text-2xl">▶</div>
-              <p className="font-semibold">GIF / VIDEO</p>
-              <p className="mt-1 text-sm text-white/40">Exercise media will be managed from Admin</p>
-            </div>
+          <div className="flex aspect-video items-center justify-center overflow-hidden bg-black/40 text-center">
+            {exercise.mediaUrl ? (
+              exercise.mediaType === "IMAGE" || exercise.mediaType === "GIF" ? (
+                <img src={exercise.mediaUrl} alt={exercise.name} className="h-full w-full object-cover" />
+              ) : (
+                <video src={exercise.mediaUrl} controls playsInline className="h-full w-full object-cover" />
+              )
+            ) : (
+              <div>
+                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full border border-lime-300/30 bg-lime-300/10 text-2xl">▶</div>
+                <p className="font-semibold">GIF / VIDEO</p>
+                <p className="mt-1 text-sm text-white/40">Exercise media will be managed from Admin</p>
+              </div>
+            )}
           </div>
           <div className="grid gap-8 p-6 md:grid-cols-[1fr_320px] md:p-8">
             <div>
@@ -67,6 +76,7 @@ export default function ExercisePlayer({ exerciseSlug }: Props) {
                 <h2 className="text-lg font-semibold">Technique</h2>
                 <ul className="mt-3 space-y-3 text-sm text-white/65">{exercise.instructions.map((item) => <li key={item}>• {item}</li>)}</ul>
               </div>
+              {exercise.cues.length > 0 && <div className="mt-7 flex flex-wrap gap-2">{exercise.cues.map((cue) => <span key={cue} className="rounded-full border border-white/10 px-3 py-2 text-xs text-white/55">{cue}</span>)}</div>}
             </div>
             <aside className="rounded-3xl bg-black/30 p-5">
               <p className="text-xs font-semibold tracking-[0.18em] text-white/40">WORKING WEIGHT</p>

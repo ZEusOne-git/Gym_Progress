@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -10,11 +10,33 @@ export default function RegisterPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    sessionStorage.setItem("gym-progress-registration", JSON.stringify({ name, email, password }));
-    router.push("/onboarding");
+    setError("");
+    setLoading(true);
+
+    try {
+      const response = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, email, password }),
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.error ?? "Unable to create account.");
+        return;
+      }
+
+      router.push("/onboarding");
+    } catch {
+      setError("Something went wrong. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -31,7 +53,8 @@ export default function RegisterPage() {
         <label className="block"><span className="mb-2 block text-sm font-semibold">Name</span><input required value={name} onChange={(event) => setName(event.target.value)} type="text" placeholder="Your name" className="w-full rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-4 py-4 outline-none focus:border-[var(--accent)]" /></label>
         <label className="block"><span className="mb-2 block text-sm font-semibold">Email</span><input required value={email} onChange={(event) => setEmail(event.target.value)} type="email" placeholder="you@example.com" className="w-full rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-4 py-4 outline-none focus:border-[var(--accent)]" /></label>
         <label className="block"><span className="mb-2 block text-sm font-semibold">Password</span><input required minLength={8} value={password} onChange={(event) => setPassword(event.target.value)} type="password" placeholder="At least 8 characters" className="w-full rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-4 py-4 outline-none focus:border-[var(--accent)]" /></label>
-        <button type="submit" className="w-full rounded-2xl bg-[var(--accent)] px-5 py-4 font-black text-[var(--accent-foreground)]">CONTINUE</button>
+        {error && <p role="alert" className="rounded-2xl border border-red-400/30 bg-red-400/10 px-4 py-3 text-sm text-red-200">{error}</p>}
+        <button disabled={loading} type="submit" className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[var(--accent)] px-5 py-4 font-black text-[var(--accent-foreground)] disabled:cursor-not-allowed disabled:opacity-60">{loading && <Loader2 className="animate-spin" size={18} />} {loading ? "CREATING ACCOUNT..." : "CONTINUE"}</button>
       </form>
 
       <p className="mt-8 text-center text-sm text-[var(--muted)]">Already have an account? <Link href="/login" className="font-bold text-[var(--accent)]">Login</Link></p>

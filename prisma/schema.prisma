@@ -167,17 +167,23 @@ model WorkoutTemplate {
 }
 
 model WorkoutExercise {
-  id             String          @id @default(cuid())
-  templateId     String
-  exerciseId     String
-  orderIndex     Int
-  sets            Int
-  repMin         Int
-  repMax         Int
-  rirTarget      Float?
-  restSeconds    Int
-  template       WorkoutTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
-  exercise       Exercise         @relation(fields: [exerciseId], references: [id])
+  id                 String          @id @default(cuid())
+  templateId         String
+  exerciseId         String
+  orderIndex         Int
+  sets               Int
+  repMin             Int
+  repMax             Int
+  rirTarget          Float?
+  restSeconds        Int
+  setType            String          @default("NORMAL")
+  progressionType    String          @default("DOUBLE_PROGRESSION")
+  loadIncrement      Float?
+  tempo              String?
+  targetWeight       Float?
+  notes              String?
+  template           WorkoutTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  exercise           Exercise         @relation(fields: [exerciseId], references: [id])
 }
 
 model WorkoutSession {

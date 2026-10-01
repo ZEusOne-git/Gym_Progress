@@ -51,17 +51,28 @@ enum Muscle {
 model User {
   id                 String                 @id @default(cuid())
   email              String                 @unique
+  passwordHash       String
   role               UserRole               @default(USER)
   createdAt          DateTime               @default(now())
   updatedAt          DateTime               @updatedAt
   profile            Profile?
   onboarding         OnboardingResponse?
+  sessions           AuthSession[]
   plans              WorkoutPlan[]
-  sessions           WorkoutSession[]
+  sessionsLog        WorkoutSession[]
   weightLogs         WeightLog[]
   bodyMeasurements   BodyMeasurement[]
   notificationPrefs  NotificationPreference?
   auditEntries       AuditLog[]
+}
+
+model AuthSession {
+  id         String   @id @default(cuid())
+  userId     String
+  tokenHash  String   @unique
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Profile {
@@ -95,22 +106,22 @@ model OnboardingResponse {
 }
 
 model Exercise {
-  id               String            @id @default(cuid())
-  name             String
-  slug             String            @unique
-  category         String
-  primaryMuscles   String
-  secondaryMuscles String            @default("[]")
-  equipment        String            @default("[]")
-  difficulty       Difficulty        @default(BEGINNER)
-  instructionsJson String            @default("[]")
-  mistakesJson     String            @default("[]")
-  cuesJson         String            @default("[]")
-  isActive         Boolean           @default(true)
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
-  media            ExerciseMedia[]
-  workoutExercises WorkoutExercise[]
+  id                 String            @id @default(cuid())
+  name               String
+  slug               String            @unique
+  category           String
+  primaryMuscles     String
+  secondaryMuscles   String            @default("[]")
+  equipment          String            @default("[]")
+  difficulty         Difficulty        @default(BEGINNER)
+  instructionsJson   String            @default("[]")
+  mistakesJson       String            @default("[]")
+  cuesJson           String            @default("[]")
+  isActive           Boolean           @default(true)
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  media              ExerciseMedia[]
+  workoutExercises   WorkoutExercise[]
 }
 
 model ExerciseMedia {
@@ -165,7 +176,7 @@ model WorkoutExercise {
   rirTarget      Float?
   restSeconds    Int
   template       WorkoutTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
-  exercise       Exercise        @relation(fields: [exerciseId], references: [id])
+  exercise       Exercise         @relation(fields: [exerciseId], references: [id])
 }
 
 model WorkoutSession {
@@ -217,7 +228,7 @@ model NotificationPreference {
   userId          String  @unique
   workoutReminders Boolean @default(true)
   weeklySummary   Boolean @default(true)
-  user            User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model AuditLog {

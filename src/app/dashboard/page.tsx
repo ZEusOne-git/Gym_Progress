@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { BarChart3, CalendarDays, ChevronRight, Dumbbell, Flame, Play, Sparkles, Target, TrendingUp, UserRound } from "lucide-react";
+import type { ElementType } from "react";
 import { getCurrentUser } from "@/lib/auth";
 
 const stats = [
@@ -9,6 +10,13 @@ const stats = [
   ["0 kg", "Weight change", TrendingUp],
   ["0%", "Consistency", Target],
 ] as const;
+
+const navItems: Array<[string, string, ElementType]> = [
+  ["Dashboard", "/dashboard", BarChart3],
+  ["Workout", "/workout", Play],
+  ["Progress", "/progress", TrendingUp],
+  ["Profile", "/profile", UserRound],
+];
 
 export default async function DashboardPage() {
   const user = await getCurrentUser();
@@ -37,7 +45,7 @@ export default async function DashboardPage() {
           <div className="rounded-[2rem] border border-[var(--border)] bg-[var(--surface)] p-6 sm:p-7"><div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--surface-strong)] text-[var(--accent)]"><Sparkles size={19} /></div><p className="mt-6 text-xs font-black tracking-[0.18em] text-[var(--accent)]">YOUR PROFILE</p><h3 className="mt-2 text-2xl font-black">Ready to personalize.</h3><p className="mt-3 text-sm leading-6 text-[var(--muted)]">Your onboarding answers are saved. The workout engine can now turn them into a weekly plan.</p><Link href="/profile" className="mt-6 flex items-center justify-between rounded-2xl bg-[var(--surface-strong)] px-4 py-3 text-sm font-bold">View profile <ChevronRight size={18} className="text-[var(--accent)]" /></Link></div>
         </section>
 
-        <nav className="fixed inset-x-0 bottom-4 z-20 mx-auto flex w-[calc(100%-2rem)] max-w-md items-center justify-around rounded-3xl border border-[var(--border)] bg-[var(--surface)]/95 p-2 shadow-2xl backdrop-blur-xl">{[["Dashboard", "/dashboard", BarChart3], ["Workout", "/workout", Play], ["Progress", "/progress", TrendingUp], ["Profile", "/profile", UserRound]].map(([label, href, Icon], index) => <Link key={String(label)} href={String(href)} className={`flex min-w-16 flex-col items-center gap-1 rounded-2xl px-3 py-2 text-[10px] font-bold ${index === 0 ? "bg-[var(--accent)] text-[var(--accent-foreground)]" : "text-[var(--muted)]"}`}><Icon size={17} />{label}</Link>)}</nav>
+        <nav className="fixed inset-x-0 bottom-4 z-20 mx-auto flex w-[calc(100%-2rem)] max-w-md items-center justify-around rounded-3xl border border-[var(--border)] bg-[var(--surface)]/95 p-2 shadow-2xl backdrop-blur-xl">{navItems.map(([label, href, Icon], index) => <Link key={label} href={href} className={`flex min-w-16 flex-col items-center gap-1 rounded-2xl px-3 py-2 text-[10px] font-bold ${index === 0 ? "bg-[var(--accent)] text-[var(--accent-foreground)]" : "text-[var(--muted)]"}`}><Icon size={17} />{label}</Link>)}</nav>
       </div>
     </main>
   );

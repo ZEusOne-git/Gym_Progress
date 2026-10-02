@@ -38,6 +38,7 @@ export default function ActiveWorkoutPage() {
   const [startedAt, setStartedAt] = useState<string | null>(null);
   const [storedElapsed, setStoredElapsed] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
+  const [showExitPrompt, setShowExitPrompt] = useState(false);
   const pauseInFlightRef = useRef(false);
 
   const query = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
@@ -166,10 +167,38 @@ export default function ActiveWorkoutPage() {
       window.location.href = "/calendar";
       return;
     }
+    setShowExitPrompt(true);
+  }
+
+  async function resumeLater() {
+    setShowExitPrompt(false);
     setSaving(true);
     const paused = await pauseWorkout();
     if (paused) window.location.href = "/calendar";
     else setSaving(false);
+  }
+
+  async function finishEarly() {
+    if (!sessionId || saving || finished) return;
+    setSaving(true);
+    setError("");
+    try {
+      const response = await fetch("/api/workouts/session", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ sessionId, action: "finish" }),
+      });
+      const json = await response.json();
+      if (!response.ok) throw new Error(json.error || "Impossibile terminare l'allenamento.");
+      setShowExitPrompt(false);
+      setFinished(true);
+      window.setTimeout(() => {
+        window.location.href = `/calendar?ended=1${scheduledDate ? `&date=${scheduledDate}` : ""}`;
+      }, 900);
+    } catch (errorValue) {
+      setError(errorValue instanceof Error ? errorValue.message : "Impossibile terminare l'allenamento.");
+      setSaving(false);
+    }
   }
 
   async function startWorkout() {
@@ -272,6 +301,32 @@ export default function ActiveWorkoutPage() {
           {phase !== "rest" && <div className="shrink-0 pt-2 sm:pt-4"><button type="button" onClick={phase === "working" ? completeSet : beginSet} disabled={saving || !currentSet} className={`inline-flex min-h-[58px] w-full items-center justify-center gap-2 rounded-[1.15rem] px-6 py-4 text-sm font-black shadow-2xl transition duration-200 active:scale-[.985] disabled:opacity-60 ${phase === "working" ? "bg-[var(--accent)] text-[var(--accent-foreground)] shadow-[0_14px_45px_rgba(190,255,38,.22)]" : "bg-white !text-black shadow-black/30"}`}>{phase === "working" ? <><Check size={18} strokeWidth={3}/> {saving ? "SALVATAGGIO..." : isLastSet && isLastExercise ? "COMPLETA ALLENAMENTO" : "COMPLETA SERIE"}</> : <><Play size={18} fill="currentColor"/> INIZIA SERIE</>}</button></div>}
           {error && <p className="mt-2 shrink-0 rounded-xl border border-red-300/20 bg-red-500/15 px-3 py-2 text-center text-xs font-bold text-white">{error}</p>}
         </div>
+
+        {showExitPrompt && !isPaused && (
+          <div className="absolute inset-0 z-40 grid place-items-center bg-black/70 p-5 backdrop-blur-md">
+            <div className="w-full max-w-sm rounded-[2rem] border border-white/10 bg-black/80 p-6 shadow-2xl">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-[9px] font-black uppercase tracking-[0.28em] text-[var(--accent)]">USCITA ALLENAMENTO</p>
+                  <h2 className="mt-2 text-3xl font-black tracking-[-0.05em]">Cosa vuoi fare?</h2>
+                  <p className="mt-2 text-sm leading-6 text-white/60">La sessione non deve restare in sospeso senza una tua scelta.</p>
+                </div>
+                <button type="button" onClick={() => setShowExitPrompt(false)} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-lg text-white/70" aria-label="Continua allenamento">×</button>
+              </div>
+              <div className="mt-6 grid gap-3">
+                <button type="button" onClick={() => void resumeLater()} disabled={saving} className="rounded-2xl border border-white/10 bg-white/8 px-4 py-4 text-left transition active:scale-[.99] disabled:opacity-60">
+                  <p className="text-sm font-black">Riprendi in un secondo momento</p>
+                  <p className="mt-1 text-xs leading-5 text-white/55">Metti in pausa e torna al Calendario. Nulla viene perso.</p>
+                </button>
+                <button type="button" onClick={() => void finishEarly()} disabled={saving} className="rounded-2xl bg-[var(--accent)] px-4 py-4 text-left text-[var(--accent-foreground)] transition active:scale-[.99] disabled:opacity-60">
+                  <p className="text-sm font-black">Termina completamente allenamento</p>
+                  <p className="mt-1 text-xs leading-5 opacity-70">Chiudi la sessione adesso. Le serie già registrate restano salvate.</p>
+                </button>
+              </div>
+              {saving ? <p className="mt-4 text-center text-[9px] font-black uppercase tracking-[0.2em] text-white/45">SALVATAGGIO...</p> : null}
+            </div>
+          </div>
+        )}
 
         {isPaused && (
           <div className="absolute inset-0 z-40 grid place-items-center bg-black/70 p-6 backdrop-blur-md">

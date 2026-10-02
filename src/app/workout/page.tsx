@@ -3,14 +3,13 @@ import { redirect } from "next/navigation";
 import { ArrowLeft, Check, Clock3, Dumbbell, Play, TimerReset } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { AppNav } from "@/components/AppNav";
 
 export default async function WorkoutPage({ searchParams }: { searchParams: Promise<{ day?: string; date?: string }> }) {
   const user = await getCurrentUser(); if (!user) redirect("/login?next=/workout"); if (!user.onboarding?.completedAt) redirect("/onboarding");
   const params = await searchParams; const requestedDay = Number(params.day);
   const plan = await prisma.workoutPlan.findFirst({ where: { userId: user.id, isActive: true, isTemplate: false }, orderBy: { updatedAt: "desc" }, select: { id: true, name: true, templates: { orderBy: { dayNumber: "asc" }, select: { id: true, dayNumber: true, name: true, estimatedMins: true, exercises: { orderBy: { orderIndex: "asc" }, select: { id: true, sets: true, repMin: true, repMax: true, restSeconds: true, targetWeight: true, exercise: { select: { name: true, category: true } } } } } } } });
   const template = plan?.templates.find(t => t.dayNumber === requestedDay) ?? plan?.templates[0] ?? null;
-  if (!plan || !template) return <main className="min-h-screen p-8"><Link href="/calendar" className="text-sm font-bold text-[var(--accent)]">← Torna al calendario</Link><h1 className="mt-6 text-3xl font-black">Nessun programma assegnato</h1><p className="mt-2 text-[var(--muted)]">Quando l'admin assegnerà una scheda, la vedrai qui.</p><AppNav /></main>;
+  if (!plan || !template) return <main className="min-h-screen p-8"><Link href="/calendar" className="text-sm font-bold text-[var(--accent)]">← Torna al calendario</Link><h1 className="mt-6 text-3xl font-black">Nessun programma assegnato</h1><p className="mt-2 text-[var(--muted)]">Quando l'admin assegnerà una scheda, la vedrai qui.</p></main>;
   const totalMinutes = template.estimatedMins ?? Math.max(15, Math.round(template.exercises.reduce((sum, e) => sum + Math.max(4, e.sets * 3), 0))); const recovery = Math.max(1, Math.round(template.exercises.reduce((s, e) => s + e.restSeconds, 0) / 60));
   return <main className="min-h-screen bg-[var(--background)] pb-28"><div className="mx-auto max-w-5xl px-5 py-6 sm:px-8 lg:px-10">
     <Link href="/calendar" className="inline-flex items-center gap-2 text-sm font-bold text-[var(--muted)] transition hover:text-[var(--foreground)]"><ArrowLeft size={17}/> Calendario</Link>

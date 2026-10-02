@@ -2,197 +2,140 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { BarChart3, CalendarDays, ChevronLeft, ChevronRight, Check, Play, UserRound, Plus, X } from "lucide-react";
+import { ArrowRight, BarChart3, CalendarDays, Check, ChevronLeft, ChevronRight, Clock3, Dumbbell, UserRound } from "lucide-react";
 
-type Template = { id: string; dayNumber: number; name: string; estimatedMins: number | null; exercises: { id: string; sets: number; repMin: number; repMax: number; exercise: { name: string } }[] };
+type Exercise = { id: string; sets: number; repMin: number; repMax: number; exercise: { name: string } };
+type Template = { id: string; dayNumber: number; name: string; estimatedMins: number | null; exercises: Exercise[] };
 type Schedule = { id: string; scheduledDate: string; templateId: string; template: Template; session: { id: string; startedAt: string; completedAt: string | null } | null };
-type Data = { plan: { id: string; name: string; templates: Template[] } | null; schedules: Schedule[]; sessions: { id: string; startedAt: string; completedAt: string | null }[]; nextSchedule: { id: string; scheduledDate: string; template: { id: string; dayNumber: number; name: string; estimatedMins: number | null; exercises: { id: string }[] } } | null };
+type Data = { plan: { id: string; name: string; templates: Template[] } | null; schedules: Schedule[]; sessions: { id: string; startedAt: string; completedAt: string | null }[]; nextSchedule: { id: string; scheduledDate: string; template: Template } | null };
 
 const navItems = [["Dashboard", "/dashboard", BarChart3], ["Progress", "/progress", BarChart3], ["Calendario", "/calendar", CalendarDays], ["Profilo", "/profile", UserRound]] as const;
-function keyOf(date: Date) { return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`; }
-function sameDay(a: Date, b: Date) { return keyOf(a) === keyOf(b); }
-function monthDays(date: Date) { const first = new Date(date.getFullYear(), date.getMonth(), 1); const count = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate(); const offset = (first.getDay() + 6) % 7; return [...Array(offset).fill(null), ...Array.from({ length: count }, (_, i) => new Date(date.getFullYear(), date.getMonth(), i + 1))]; }
-function addDays(date: Date, amount: number) { return new Date(date.getFullYear(), date.getMonth(), date.getDate() + amount); }
+const keyOf = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const addDays = (d: Date, n: number) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
+const sameDay = (a: Date, b: Date) => keyOf(a) === keyOf(b);
+const monthStart = (d: Date) => new Date(d.getFullYear(), d.getMonth(), 1);
 
 export default function CalendarPage() {
-  const [date, setDate] = useState(new Date());
   const [selected, setSelected] = useState(new Date());
   const [data, setData] = useState<Data | null>(null);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [completedNotice, setCompletedNotice] = useState(false);
-  const mobileTrackRef = useRef<HTMLDivElement | null>(null);
-  const scrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [notice, setNotice] = useState(false);
+  const railRef = useRef<HTMLDivElement | null>(null);
+  const selectedKey = keyOf(selected);
+  const today = new Date();
 
-  const load = async () => {
-    setLoading(true);
-    setError("");
+  async function load() {
+    setLoading(true); setError("");
     try {
-      const months = [-1, 0, 1].map(offset => new Date(date.getFullYear(), date.getMonth() + offset, 1));
-      const responses = await Promise.all(months.map(month => fetch(`/api/workouts/dashboard?year=${month.getFullYear()}&month=${month.getMonth()}`).then(r => r.json())));
-      const valid = responses.filter((item: Data) => item && typeof item === "object");
-      const base = valid[1] ?? valid[0];
+      const center = monthStart(selected);
+      const months = Array.from({ length: 6 }, (_, i) => new Date(center.getFullYear(), center.getMonth() + i - 1, 1));
+      const results = await Promise.all(months.map(m => fetch(`/api/workouts/dashboard?year=${m.getFullYear()}&month=${m.getMonth()}`).then(r => r.json())));
+      const valid = results.filter((x): x is Data => Boolean(x && typeof x === "object"));
+      const base = valid.find(x => x.plan) ?? valid[0];
       if (!base) throw new Error("Impossibile caricare il calendario.");
       const merged = new Map<string, Schedule>();
-      valid.forEach((item: Data) => item.schedules?.forEach(schedule => merged.set(schedule.id, schedule)));
-      setData({ ...base, schedules: Array.from(merged.values()).sort((a, b) => a.scheduledDate.localeCompare(b.scheduledDate)) });
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Impossibile caricare il calendario.");
-    } finally {
-      setLoading(false);
-    }
-  };
+      valid.forEach(x => x.schedules?.forEach(s => merged.set(s.id, s)));
+      setData({ ...base, schedules: [...merged.values()].sort((a, b) => a.scheduledDate.localeCompare(b.scheduledDate)) });
+    } catch (e) { setError(e instanceof Error ? e.message : "Impossibile caricare il calendario."); }
+    finally { setLoading(false); }
+  }
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("completed") === "1") {
-      setCompletedNotice(true);
-      const completedDate = params.get("date");
-      if (completedDate) {
-        const d = new Date(`${completedDate}T12:00:00`);
-        if (!Number.isNaN(d.getTime())) {
-          setSelected(d);
-          setDate(new Date(d.getFullYear(), d.getMonth(), 1));
-        }
-      }
+      setNotice(true);
+      const value = params.get("date");
+      if (value) { const d = new Date(`${value}T12:00:00`); if (!Number.isNaN(d.getTime())) setSelected(d); }
       window.history.replaceState({}, "", "/calendar");
     }
-    fetch("/api/auth/me").then(r => r.json()).then(d => {
-      if (!d.user) window.location.href = "/login?next=/calendar";
-      else if (d.user.role === "USER" && !d.user.onboarding?.completedAt) window.location.href = "/onboarding";
+    fetch("/api/auth/me").then(r => r.json()).then(x => {
+      if (!x.user) window.location.href = "/login?next=/calendar";
+      else if (x.user.role === "USER" && !x.user.onboarding?.completedAt) window.location.href = "/onboarding";
     });
   }, []);
 
-  useEffect(() => { void load(); }, [date]);
+  useEffect(() => { void load(); }, [monthStart(selected).getTime()]);
 
-  const days = useMemo(() => monthDays(date), [date]);
-  // A long rolling range makes the rail feel continuous instead of like a finite row of cards.
-  const mobileDays = useMemo(() => Array.from({ length: 181 }, (_, index) => addDays(selected, index - 90)), [selected]);
-  const today = new Date();
-  const selectedKey = keyOf(selected);
-  const selectedSchedule = data?.schedules.find(s => keyOf(new Date(s.scheduledDate)) === selectedKey) ?? null;
+  const schedules = useMemo(() => new Map((data?.schedules ?? []).map(s => [keyOf(new Date(s.scheduledDate)), s])), [data?.schedules]);
+  const selectedSchedule = schedules.get(selectedKey) ?? null;
+  const days = useMemo(() => Array.from({ length: 61 }, (_, i) => addDays(selected, i - 30)), [selectedKey]);
+  const completed = Boolean(selectedSchedule?.session?.completedAt);
+  const todaySelected = sameDay(selected, today);
 
   useEffect(() => {
-    const track = mobileTrackRef.current;
-    if (!track) return;
-    const selectedCard = track.querySelector<HTMLElement>(`[data-calendar-card="${selectedKey}"]`);
-    if (!selectedCard) return;
-    const left = selectedCard.offsetLeft - (track.clientWidth - selectedCard.clientWidth) / 2;
-    track.scrollTo({ left: Math.max(0, left), behavior: "smooth" });
+    const rail = railRef.current;
+    const target = rail?.querySelector<HTMLElement>(`[data-day="${selectedKey}"]`);
+    if (!rail || !target) return;
+    rail.scrollTo({ left: Math.max(0, target.offsetLeft - (rail.clientWidth - target.clientWidth) / 2), behavior: "smooth" });
   }, [selectedKey]);
 
-  function goMonth(amount: number) {
-    const next = new Date(date.getFullYear(), date.getMonth() + amount, 1);
-    setDate(next);
-    setSelected(next);
-  }
-
-  function goToday() {
-    const n = new Date();
-    setDate(new Date(n.getFullYear(), n.getMonth(), 1));
-    setSelected(n);
-  }
-
-  function handleCarouselScroll() {
-    if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current);
-    scrollTimerRef.current = setTimeout(() => {
-      const track = mobileTrackRef.current;
-      if (!track) return;
-      const cards = Array.from(track.querySelectorAll<HTMLElement>("[data-calendar-card]"));
+  function move(n: number) { setSelected(d => addDays(d, n)); }
+  function todayAction() { setSelected(new Date()); }
+  function onRailScroll() {
+    const rail = railRef.current; if (!rail) return;
+    requestAnimationFrame(() => {
+      const center = rail.scrollLeft + rail.clientWidth / 2;
       let closest: { key: string; distance: number } | null = null;
-      const center = track.scrollLeft + track.clientWidth / 2;
-      for (const card of cards) {
-        const cardCenter = card.offsetLeft + card.clientWidth / 2;
-        const distance = Math.abs(center - cardCenter);
-        const key = card.dataset.calendarCard;
-        if (key && (!closest || distance < closest.distance)) closest = { key, distance };
-      }
+      rail.querySelectorAll<HTMLElement>("[data-day]").forEach(card => {
+        const key = card.dataset.day; if (!key) return;
+        const distance = Math.abs(center - (card.offsetLeft + card.clientWidth / 2));
+        if (!closest || distance < closest.distance) closest = { key, distance };
+      });
       if (closest && closest.key !== selectedKey) {
-        const next = new Date(`${closest.key}T12:00:00`);
-        if (!Number.isNaN(next.getTime())) {
-          setSelected(next);
-          setDate(new Date(next.getFullYear(), next.getMonth(), 1));
-        }
+        const d = new Date(`${closest.key}T12:00:00`); if (!Number.isNaN(d.getTime())) setSelected(d);
       }
-    }, 80);
+    });
   }
 
-  async function schedule(templateId: string) {
-    setSaving(true); setError("");
-    try {
-      const r = await fetch("/api/workouts/schedule", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ templateId, date: selectedKey }) });
-      const d = await r.json();
-      if (!r.ok) throw new Error(d.error || "Impossibile programmare l'allenamento.");
-      await load();
-    } catch (e) { setError(e instanceof Error ? e.message : "Errore"); }
-    finally { setSaving(false); }
-  }
-
-  async function removeSchedule() {
-    setSaving(true); setError("");
-    try {
-      const r = await fetch("/api/workouts/schedule", { method: "DELETE", headers: { "content-type": "application/json" }, body: JSON.stringify({ date: selectedKey }) });
-      const d = await r.json();
-      if (!r.ok) throw new Error(d.error || "Impossibile rimuovere l'allenamento.");
-      await load();
-    } catch (e) { setError(e instanceof Error ? e.message : "Errore"); }
-    finally { setSaving(false); }
-  }
-
-  const scheduleFor = (day: Date) => data?.schedules.find(s => sameDay(new Date(s.scheduledDate), day)) ?? null;
-
-  const renderDesktopDay = (day: Date) => {
-    const schedule = scheduleFor(day);
-    const isSelected = sameDay(day, selected);
-    const isToday = sameDay(day, today);
-    return <button key={day.toISOString()} title={`${day.toLocaleDateString("it-IT", { weekday: "long", day: "numeric", month: "long" })}${schedule ? ` · ${schedule.template.name}` : " · Riposo"}`} onClick={() => setSelected(day)} className={`relative min-w-0 overflow-hidden rounded-2xl p-2 text-left transition ${isSelected ? "ring-2 ring-[var(--accent)]" : "border border-[var(--border)]"} ${isToday ? "bg-[var(--surface-strong)]" : "bg-[var(--background)]"}`}><span className="block truncate text-[9px] font-black uppercase text-[var(--muted)] sm:text-[10px]">{day.toLocaleDateString("it-IT", { weekday: "short" }).replace(".", "")}</span><span className="mt-1 block text-lg font-black sm:text-xl">{day.getDate()}</span>{schedule?.session?.completedAt ? <span className="mt-2 flex items-center justify-center text-[var(--accent)]"><Check size={13} strokeWidth={3}/></span> : schedule ? <span className="mt-2 flex items-center justify-center"><span className="h-2 w-2 rounded-full bg-[var(--accent)]"/></span> : data?.plan ? <span className="mt-2 block truncate text-[8px] font-black uppercase text-[var(--muted)] sm:text-[9px]">Riposo</span> : isToday ? <span className="mt-2 block truncate text-[8px] font-black uppercase text-[var(--accent)] sm:text-[9px]">Oggi</span> : null}</button>;
-  };
-
-  const renderMobileDay = (day: Date) => {
-    const schedule = scheduleFor(day);
-    const isSelected = sameDay(day, selected);
-    const isToday = sameDay(day, today);
-    const status = schedule?.session?.completedAt ? "FATTO" : schedule ? "ALLENAMENTO" : "RIPOSO";
-    return <button key={day.toISOString()} type="button" data-calendar-card={keyOf(day)} onClick={() => { setSelected(day); setDate(new Date(day.getFullYear(), day.getMonth(), 1)); }} className={`snap-center shrink-0 text-center transition-all duration-300 ease-out focus:outline-none ${isSelected ? "w-[82px]" : "w-[64px] opacity-55"}`}>
-      <div className={`mx-auto flex h-[108px] w-full flex-col items-center justify-center rounded-[1.35rem] border ${isSelected ? "border-[var(--accent)] bg-[var(--accent)] text-[var(--accent-foreground)] shadow-[0_12px_30px_rgba(0,0,0,0.24)]" : "border-[var(--border)] bg-[var(--background)] text-[var(--foreground)]"}`}>
-        <span className={`text-[10px] font-black uppercase tracking-wider ${isSelected ? "opacity-70" : "text-[var(--muted)]"}`}>{day.toLocaleDateString("it-IT", { weekday: "short" }).replace(".", "")}</span>
-        <span className={`mt-1 font-black leading-none ${isSelected ? "text-[34px]" : "text-[26px]"}`}>{day.getDate()}</span>
-        <span className={`mt-3 h-1.5 w-1.5 rounded-full ${schedule ? "bg-[var(--accent)]" : "bg-[var(--muted)]"} ${isSelected && schedule ? "bg-[var(--accent-foreground)]" : ""}`} />
-        <span className={`mt-1 max-w-[58px] truncate text-[7px] font-black uppercase tracking-tight ${isSelected ? "opacity-70" : "text-[var(--muted)]"}`}>{status}</span>
-      </div>
-      {isToday && <span className="mt-2 block text-[8px] font-black uppercase tracking-[0.12em] text-[var(--accent)]">Oggi</span>}
-    </button>;
-  };
-
-  return <main className="min-h-screen bg-[var(--background)] pb-28"><div className="mx-auto max-w-5xl px-4 py-6 sm:px-8">
-    <header><p className="text-xs font-black tracking-[0.22em] text-[var(--accent)]">TRAINING CALENDAR</p><h1 className="mt-2 text-4xl font-black tracking-tight">Calendario</h1><p className="mt-2 text-sm text-[var(--muted)]">Il programma viene distribuito automaticamente nella settimana e ripetuto per le prossime 12 settimane. I giorni senza allenamento sono giorni di recupero.</p></header>
-    {completedNotice && <section className="mt-5 flex items-center gap-3 rounded-2xl border border-[var(--accent)]/30 bg-[var(--accent)]/10 p-4"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--accent)] text-[var(--accent-foreground)]"><Check size={18}/></span><div><p className="font-black">Allenamento completato!</p><p className="text-sm text-[var(--muted)]">Ottimo lavoro. Il calendario è stato aggiornato e la prossima sessione userà la tua performance per suggerire il carico.</p></div><button type="button" onClick={() => setCompletedNotice(false)} className="ml-auto text-sm font-black text-[var(--muted)]" aria-label="Chiudi">×</button></section>}
-
-    <section className="mt-7 rounded-[2rem] border border-[var(--border)] bg-[var(--surface)] p-4 sm:p-7">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0"><p className="text-xs font-black uppercase tracking-wider text-[var(--muted)]">{date.toLocaleDateString("it-IT", { month: "long", year: "numeric" })}</p><h2 className="mt-1 max-w-full break-words text-xl font-black leading-tight sm:text-2xl">{data?.plan?.name || "Nessun programma"}</h2></div>
-        <div className="hidden shrink-0 items-center gap-1.5 sm:flex sm:gap-2"><button aria-label="Mese precedente" onClick={() => goMonth(-1)} className="btn-surface rounded-xl p-2"><ChevronLeft size={18}/></button><button onClick={goToday} className="btn-surface rounded-xl px-3 py-2 text-xs font-black">OGGI</button><button aria-label="Mese successivo" onClick={() => goMonth(1)} className="btn-surface rounded-xl p-2"><ChevronRight size={18}/></button></div>
-        <div className="flex w-full items-center gap-2 sm:hidden"><button aria-label="Giorno precedente" onClick={() => setSelected(addDays(selected, -1))} className="btn-surface shrink-0 rounded-xl p-2.5"><ChevronLeft size={19}/></button><div className="min-w-0 flex-1 text-center"><p className="text-[10px] font-black uppercase tracking-[0.16em] text-[var(--accent)]">{selected.toLocaleDateString("it-IT", { month: "long", year: "numeric" })}</p><p className="truncate text-sm font-black">{selected.toLocaleDateString("it-IT", { weekday: "long", day: "numeric", month: "long" })}</p></div><button onClick={goToday} className="btn-surface shrink-0 rounded-xl px-3 py-2.5 text-[10px] font-black">OGGI</button><button aria-label="Giorno successivo" onClick={() => setSelected(addDays(selected, 1))} className="btn-surface shrink-0 rounded-xl p-2.5"><ChevronRight size={19}/></button></div>
-      </div>
-
-      <div className="relative mt-6 sm:hidden">
-        <div ref={mobileTrackRef} onScroll={handleCarouselScroll} className="flex snap-x snap-mandatory gap-2 overflow-x-auto scroll-smooth px-[calc(50%-41px)] py-3 [scrollbar-width:none] overscroll-x-contain [&::-webkit-scrollbar]:hidden">
-          {mobileDays.map(renderMobileDay)}
+  return <main className="min-h-screen bg-[var(--background)] pb-28">
+    <div className="mx-auto max-w-6xl px-4 py-6 sm:px-8 lg:px-10">
+      <header className="max-w-3xl">
+        <p className="text-[11px] font-black tracking-[0.28em] text-[var(--accent)]">TRAINING CALENDAR</p>
+        <div className="mt-2 flex items-end justify-between gap-4">
+          <div><h1 className="text-4xl font-black tracking-[-0.04em] sm:text-5xl">Calendario</h1><p className="mt-3 text-sm leading-6 text-[var(--muted)] sm:text-base">Scorri i giorni come una timeline. Il programma si ripete automaticamente e ogni sessione è pronta per essere iniziata.</p></div>
+          <button onClick={todayAction} className="hidden rounded-full border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-xs font-black transition hover:-translate-y-0.5 hover:border-[var(--accent)] sm:block">OGGI</button>
         </div>
-        <div className="pointer-events-none absolute inset-y-0 left-0 w-10 bg-gradient-to-r from-[var(--surface)] to-transparent" />
-        <div className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-[var(--surface)] to-transparent" />
-      </div>
-      <div className="mt-1 flex items-center justify-center gap-2 sm:hidden"><span className="h-1 w-7 rounded-full bg-[var(--accent)]"/><span className="text-[9px] font-black uppercase tracking-[0.12em] text-[var(--muted)]">Sfiora per cambiare giorno</span></div>
+      </header>
 
-      <div className="mt-6 hidden grid-cols-7 gap-1.5 text-center sm:grid sm:gap-2">{["Lun","Mar","Mer","Gio","Ven","Sab","Dom"].map(d => <div key={d} className="py-2 text-[10px] font-black uppercase tracking-wider text-[var(--muted)]">{d}</div>)}{days.map((day, i) => { if (!day) return <div key={`empty-${i}`} className="min-h-16"/>; return renderDesktopDay(day); })}</div>
-    </section>
+      {notice && <div className="mt-6 flex items-center gap-3 rounded-2xl border border-[var(--accent)]/30 bg-[var(--accent)]/10 px-4 py-3"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--accent)] text-[var(--accent-foreground)]"><Check size={17} strokeWidth={3}/></span><div className="min-w-0"><p className="text-sm font-black">Allenamento completato</p><p className="truncate text-xs text-[var(--muted)]">Ottimo lavoro. La sessione è stata registrata.</p></div><button onClick={() => setNotice(false)} className="ml-auto text-lg text-[var(--muted)]" aria-label="Chiudi">×</button></div>}
 
-    <section className="mt-5 rounded-[2rem] bg-[var(--accent)] p-5 text-[var(--accent-foreground)] sm:p-7"><div className="flex items-start justify-between gap-4"><div><p className="text-xs font-black tracking-[0.18em] opacity-70">{sameDay(selected, today) ? "OGGI" : selected.toLocaleDateString("it-IT", { weekday: "long", day: "numeric", month: "long" }).toUpperCase()}</p>{selectedSchedule ? <><h2 className="mt-2 text-2xl font-black">{selectedSchedule.template.name}</h2><p className="mt-2 text-sm font-medium opacity-75">{selectedSchedule.template.exercises.length} esercizi{selectedSchedule.template.estimatedMins ? ` · circa ${selectedSchedule.template.estimatedMins} min` : ""}</p></> : <><h2 className="mt-2 text-2xl font-black">Giorno di recupero</h2><p className="mt-2 text-sm font-medium opacity-75">Questo giorno è libero secondo la distribuzione automatica del programma.</p></>}</div>{selectedSchedule?.session?.completedAt && <span className="shrink-0 rounded-full bg-[var(--accent-foreground)] px-3 py-1.5 text-[10px] font-black text-[var(--accent)]">✓ COMPLETATO</span>}</div>{selectedSchedule && !selectedSchedule.session?.completedAt && <div className="mt-5 flex flex-wrap gap-2"><Link href={`/workout?day=${selectedSchedule.template.dayNumber}&date=${selectedKey}`} className="btn-dark inline-flex items-center gap-2 rounded-2xl bg-[var(--accent-foreground)] px-5 py-3.5 text-sm font-black text-[var(--accent)]"><Play size={16} fill="currentColor"/> VEDI ALLENAMENTO</Link><button type="button" onClick={removeSchedule} disabled={saving} className="btn-outline-on-accent inline-flex items-center gap-2 rounded-2xl border border-[var(--accent-foreground)] px-4 py-3.5 text-sm font-black text-[var(--accent-foreground)]"><X size={16}/> RIMUOVI</button></div>}</section>
+      <section className="mt-8 overflow-hidden rounded-[2rem] border border-[var(--border)] bg-[var(--surface)] py-5 sm:py-7">
+        <div className="flex items-center justify-between px-5 sm:px-8">
+          <div className="min-w-0"><p className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--muted)]">{selected.toLocaleDateString("it-IT", { month: "long", year: "numeric" })}</p><p className="mt-1 truncate text-lg font-black">{data?.plan?.name || "Il tuo programma"}</p></div>
+          <div className="flex items-center gap-1"><button onClick={() => move(-7)} className="btn-surface rounded-full p-2.5" aria-label="Settimana precedente"><ChevronLeft size={18}/></button><button onClick={() => move(7)} className="btn-surface rounded-full p-2.5" aria-label="Settimana successiva"><ChevronRight size={18}/></button></div>
+        </div>
 
-    {!selectedSchedule && data?.plan && <section className="mt-5 rounded-[2rem] border border-[var(--border)] bg-[var(--surface)] p-5 sm:p-7"><div className="flex items-center gap-2"><Plus size={18} className="text-[var(--accent)]"/><h2 className="text-lg font-black">Scegli allenamento per questa data</h2></div><p className="mt-1 text-sm text-[var(--muted)]">La scelta manuale sostituisce il riposo per questa singola data.</p><div className="mt-4 grid gap-2 sm:grid-cols-2">{data.plan.templates.map(t => <button key={t.id} type="button" onClick={() => schedule(t.id)} disabled={saving} className="btn-surface flex items-center justify-between rounded-2xl border border-[var(--border)] p-4 text-left transition hover:border-[var(--accent)]"><div><p className="text-[10px] font-black uppercase text-[var(--muted)]">Giorno {t.dayNumber}</p><p className="mt-1 font-black">{t.name}</p></div><span className="text-xs font-bold text-[var(--muted)]">{t.exercises.length} esercizi</span></button>)}</div></section>}
-    {error && <p className="mt-4 rounded-2xl border border-red-500/30 bg-red-500/10 p-3 text-sm font-bold text-red-500">{error}</p>}
-    {loading && <p className="mt-4 text-sm text-[var(--muted)]">Caricamento calendario...</p>}
-    <nav className="fixed inset-x-0 bottom-4 z-20 mx-auto flex w-[calc(100%-2rem)] max-w-md items-center justify-around rounded-3xl border border-[var(--border)] bg-[var(--surface)]/95 p-2 shadow-2xl backdrop-blur-xl">{navItems.map(([label, href, Icon]) => <Link key={label} href={href} className={`flex min-w-16 flex-col items-center gap-1 rounded-2xl px-3 py-2 text-[10px] font-bold ${href === "/calendar" ? "bg-[var(--accent)] text-[var(--accent-foreground)]" : "text-[var(--muted)]"}`}><Icon size={17}/>{label}</Link>)}</nav>
-  </div></main>;
+        <div className="relative mt-6">
+          <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-12 bg-gradient-to-r from-[var(--surface)] to-transparent"/><div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-12 bg-gradient-to-l from-[var(--surface)] to-transparent"/>
+          <div ref={railRef} onScroll={onRailScroll} className="flex snap-x snap-mandatory gap-2 overflow-x-auto px-[calc(50%-42px)] py-3 scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {days.map(day => {
+              const key = keyOf(day), schedule = schedules.get(key), active = key === selectedKey, done = Boolean(schedule?.session?.completedAt);
+              return <button key={key} data-day={key} onClick={() => setSelected(day)} className={`snap-center shrink-0 text-center transition-all duration-300 ease-out focus:outline-none ${active ? "w-[84px] opacity-100" : "w-[58px] opacity-50 hover:opacity-80"}`}>
+                <div className={`mx-auto flex h-[96px] w-full flex-col items-center justify-center rounded-[1.45rem] border transition-all duration-300 ${active ? "scale-105 border-[var(--accent)] bg-[var(--accent)] text-[var(--accent-foreground)] shadow-[0_14px_34px_rgba(0,0,0,.22)]" : "border-[var(--border)] bg-[var(--background)]"}`}>
+                  <span className={`text-[10px] font-black uppercase tracking-[0.12em] ${active ? "opacity-65" : "text-[var(--muted)]"}`}>{day.toLocaleDateString("it-IT", { weekday: "short" }).replace(".", "")}</span>
+                  <span className={`${active ? "text-[31px]" : "text-[24px]"} mt-1 font-black leading-none`}>{day.getDate()}</span>
+                  <span className={`mt-3 text-[8px] font-black uppercase tracking-tight ${active ? "opacity-75" : "text-[var(--muted)]"}`}>{done ? "Fatto" : schedule ? "Allenamento" : "Riposo"}</span>
+                  <span className={`mt-1 h-1.5 w-1.5 rounded-full ${active ? "!bg-[var(--accent-foreground)]" : schedule ? "bg-[var(--accent)]" : "bg-[var(--muted)]"}`}/>
+                </div>
+                {sameDay(day, today) && <span className="mt-2 block text-[8px] font-black uppercase tracking-[0.18em] text-[var(--accent)]">Oggi</span>}
+              </button>;
+            })}
+          </div>
+        </div>
+
+        <div className="border-t border-[var(--border)] px-5 pt-6 sm:px-8">
+          <div className="flex items-end justify-between gap-4"><div><p className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--accent)]">{todaySelected ? "OGGI" : selected.toLocaleDateString("it-IT", { weekday: "long" }).toUpperCase()}</p><h2 className="mt-1 text-3xl font-black tracking-[-0.03em] capitalize sm:text-4xl">{selected.toLocaleDateString("it-IT", { weekday: "long", day: "numeric", month: "long" })}</h2></div><div className="hidden gap-2 sm:flex"><button onClick={() => move(-1)} className="btn-surface rounded-full p-2.5" aria-label="Giorno precedente"><ChevronLeft size={18}/></button><button onClick={() => move(1)} className="btn-surface rounded-full p-2.5" aria-label="Giorno successivo"><ChevronRight size={18}/></button></div></div>
+
+          {loading ? <div className="mt-7 animate-pulse rounded-3xl bg-[var(--background)] p-6"><div className="h-4 w-28 rounded bg-[var(--surface-strong)]"/><div className="mt-4 h-9 w-2/3 rounded bg-[var(--surface-strong)]"/><div className="mt-3 h-4 w-1/2 rounded bg-[var(--surface-strong)]"/></div> : selectedSchedule ? <div className="mt-7 grid gap-4 lg:grid-cols-[1fr_auto] lg:items-end">
+            <div className="rounded-[1.7rem] bg-[var(--background)] p-5 sm:p-6"><div className="flex flex-wrap items-center gap-2 text-[10px] font-black uppercase tracking-[0.14em] text-[var(--muted)]"><span className="inline-flex items-center gap-2"><Dumbbell size={14} className="text-[var(--accent)]"/> Giorno {selectedSchedule.template.dayNumber}</span><span className="h-1 w-1 rounded-full bg-[var(--muted)]"/><span>{selectedSchedule.template.exercises.length} esercizi</span>{selectedSchedule.template.estimatedMins && <><span className="h-1 w-1 rounded-full bg-[var(--muted)]"/><span className="inline-flex items-center gap-1"><Clock3 size={13}/> {selectedSchedule.template.estimatedMins} min</span></>}</div><h3 className="mt-4 text-3xl font-black tracking-[-0.03em] sm:text-4xl">{selectedSchedule.template.name}</h3><p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--muted)]">La scheda è pronta. I carichi consigliati vengono gestiti durante l'allenamento in base alla tua performance.</p><div className="mt-5 flex flex-wrap gap-2">{selectedSchedule.template.exercises.slice(0, 4).map(e => <span key={e.id} className="rounded-full border border-[var(--border)] px-3 py-2 text-xs font-bold text-[var(--muted)]">{e.exercise.name}</span>)}{selectedSchedule.template.exercises.length > 4 && <span className="rounded-full border border-[var(--border)] px-3 py-2 text-xs font-bold text-[var(--muted)]">+{selectedSchedule.template.exercises.length - 4}</span>}</div></div>
+            <Link href={`/workout?day=${selectedSchedule.template.dayNumber}&date=${selectedKey}`} className={`inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-4 text-sm font-black transition hover:-translate-y-0.5 ${completed ? "border border-[var(--accent)] bg-[var(--accent)] text-[var(--accent-foreground)]" : "btn-dark !text-white hover:shadow-lg"}`}>{completed ? "✓ ALLENAMENTO COMPLETATO" : "INIZIA ALLENAMENTO"}<ArrowRight size={17}/></Link>
+          </div> : data?.plan ? <div className="mt-7 rounded-[1.7rem] bg-[var(--background)] p-6 sm:p-8"><p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--muted)]">RECUPERO</p><h3 className="mt-2 text-3xl font-black tracking-[-0.03em]">Giorno di riposo.</h3><p className="mt-2 max-w-xl text-sm leading-6 text-[var(--muted)]">È previsto dal programma. Il prossimo allenamento apparirà automaticamente nel giorno stabilito.</p><button onClick={() => move(1)} className="mt-5 inline-flex items-center gap-2 text-sm font-black text-[var(--accent)]">Vedi domani <ArrowRight size={16}/></button></div> : <div className="mt-7 rounded-[1.7rem] bg-[var(--background)] p-6 sm:p-8"><p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--accent)]">NESSUN PROGRAMMA</p><h3 className="mt-2 text-3xl font-black">Il calendario è pronto.</h3><p className="mt-2 text-sm leading-6 text-[var(--muted)]">Quando viene assegnato un programma, le giornate vengono distribuite automaticamente.</p></div>}
+          {error && <p className="mt-4 text-sm font-bold text-red-400">{error}</p>}
+        </div>
+      </section>
+    </div>
+
+    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--border)] bg-[var(--surface)]/95 px-3 pb-[max(10px,env(safe-area-inset-bottom))] pt-2 backdrop-blur-xl sm:hidden"><div className="mx-auto grid max-w-md grid-cols-4 gap-1">{navItems.map(([label, href, Icon]) => { const active = label === "Calendario"; return <Link key={label} href={href} className={`flex flex-col items-center gap-1 rounded-2xl py-2 text-[10px] font-black transition ${active ? "bg-[var(--accent)] text-[var(--accent-foreground)]" : "text-[var(--muted)]"}`}><Icon size={20}/><span>{label}</span></Link>; })}</div></nav>
+  </main>;
 }

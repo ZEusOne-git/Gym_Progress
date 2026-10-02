@@ -162,6 +162,7 @@ export default function ActiveWorkoutPage() {
 
   async function startWorkout() {
     if (!templateId || saving || (sessionId && !isPaused)) return;
+    const resuming = Boolean(sessionId && isPaused);
     setSaving(true); setError("");
     try {
       const response = await fetch("/api/workouts/session", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ templateId, date: scheduledDate }) });
@@ -170,8 +171,10 @@ export default function ActiveWorkoutPage() {
       setStartedAt(json.session.startedAt);
       setStoredElapsed(json.session.elapsedSeconds ?? 0);
       setIsPaused(false);
-      setExerciseIndex(0);
-      setSetIndex(0);
+      if (!resuming) {
+        setExerciseIndex(0);
+        setSetIndex(0);
+      }
       setPhase("ready");
       setElapsed(json.session.elapsedSeconds ?? 0);
     } catch (errorValue) { setError(errorValue instanceof Error ? errorValue.message : "Errore"); } finally { setSaving(false); }

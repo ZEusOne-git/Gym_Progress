@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Search, Users, UserRound, ClipboardList, Activity } from "lucide-react";
+import Link from "next/link";
+import { Search, Users, UserRound, ClipboardList, Activity, ArrowRight } from "lucide-react";
 
 type UserRow = {
   id: string;
@@ -59,7 +60,7 @@ export default function AdminUsersPage() {
           {filtered.map(user => {
             const name = user.profile?.firstName?.trim() || "Utente";
             const plan = user.plans[0];
-            return <article key={user.id} className="rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-5 transition hover:border-[var(--accent)]/30">
+            return <Link key={user.id} href={`/admin/users/${user.id}`} className="group block rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-5 transition hover:border-[var(--accent)]/50 hover:bg-[var(--surface-strong)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/50">
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0"><h2 className="truncate text-lg font-black">{name}</h2><p className="truncate text-sm text-[var(--muted)]">{user.email}</p></div>
                 <span className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wider ${user.onboarding?.completedAt ? "bg-[var(--accent)] text-[var(--accent-foreground)]" : "bg-[var(--surface-strong)] text-[var(--muted)]"}`}>{user.onboarding?.completedAt ? "Profilo completo" : "Onboarding"}</span>
@@ -74,7 +75,11 @@ export default function AdminUsersPage() {
                 <div className="min-w-0"><p className="text-[10px] font-black uppercase tracking-wider text-[var(--muted)]">Programma attivo</p><p className="truncate text-sm font-black">{plan?.name ?? "Nessun programma assegnato"}</p></div>
                 {plan && <span className="ml-auto shrink-0 text-xs font-bold text-[var(--muted)]">{plan.templates.length} gg</span>}
               </div>
-            </article>;
+              <div className="mt-4 flex items-center justify-between border-t border-[var(--border)] pt-4 text-xs font-black">
+                <span className="text-[var(--muted)]">Apri scheda atleta</span>
+                <span className="inline-flex items-center gap-1 text-[var(--accent)] transition-transform group-hover:translate-x-0.5">Gestisci <ArrowRight size={14}/></span>
+              </div>
+            </Link>;
           })}
         </div>}
       </div>

@@ -20,7 +20,7 @@ export async function GET() {
   for (const set of hydratedSets) {
     const volume = set.weight * set.reps; const old = bestByExercise.get(set.exerciseId);
     if (!old || volume > old.volume) bestByExercise.set(set.exerciseId, { name: set.exercise.name, weight: set.weight, reps: set.reps, volume });
-    const history = historyMap.get(set.exerciseId) ?? []; history.push({ id: set.id, weight: set.weight, reps: set.reps, rir: set.rir, timestamp: set.timestamp }); historyMap.set(set.exerciseId, history);
+    const history = historyMap.get(set.exerciseId) ?? []; history.push({ id: set.id, weight: set.weight, reps: set.reps, rir: set.rir, timestamp: set.timestamp.toISOString() }); historyMap.set(set.exerciseId, history);
   }
   const exerciseHistory = exercises.map(e => ({ id: e.id, name: e.name, sets: (historyMap.get(e.id) ?? []).sort((a,b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()).slice(-12) })).filter(e => e.sets.length);
   return NextResponse.json({ sessions, sets: hydratedSets.slice(0, 60), weights, weekly, records: Array.from(bestByExercise.values()).sort((a,b) => b.volume - a.volume).slice(0, 6), exerciseHistory });

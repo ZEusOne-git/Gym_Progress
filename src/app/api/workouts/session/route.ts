@@ -35,7 +35,7 @@ export async function GET(request: Request) {
     : await prisma.workoutSession.findFirst({
         where: { userId: user.id, completedAt: null, plan: { isActive: true, isTemplate: false, templates: { some: { id: templateId } } } },
         orderBy: { startedAt: "desc" },
-        select: { id: true, startedAt: true, sets: { orderBy: [{ exerciseId: "asc" }, { setNumber: "asc" }], select: { id: true, exerciseId: true, setNumber: true, weight: true, reps: true, rir: true, completed: true } } },
+        select: { id: true, startedAt: true, pausedAt: true, elapsedSeconds: true, sets: { orderBy: [{ exerciseId: "asc" }, { setNumber: "asc" }], select: { id: true, exerciseId: true, setNumber: true, weight: true, reps: true, rir: true, completed: true } } },
       });
 
   return NextResponse.json({ session });

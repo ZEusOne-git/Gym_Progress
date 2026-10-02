@@ -28,20 +28,45 @@ function nextMonday() {
 export async function GET() {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Non autorizzato" }, { status: 401 });
-  const plans = await prisma.workoutPlan.findMany({
-    where: { isTemplate: true, isActive: true },
-    orderBy: { updatedAt: "desc" },
-    select: {
-      id: true,
-      name: true,
-      templates: {
-        orderBy: { dayNumber: "asc" },
-        select: { id: true, dayNumber: true, name: true, estimatedMins: true, _count: { select: { exercises: true } } },
+
+  const [onboarding, plans, current] = await Promise.all([
+    prisma.onboardingResponse.findUnique({ where: { userId: user.id }, select: { equipmentJson: true } }),
+    prisma.workoutPlan.findMany({
+      where: { isTemplate: true, isActive: true },
+      orderBy: { updatedAt: "desc" },
+      select: {
+        id: true,
+        name: true,
+        templates: {
+          orderBy: { dayNumber: "asc" },
+          select: {
+            id: true,
+            dayNumber: true,
+            name: true,
+            estimatedMins: true,
+            _count: { select: { exercises: true } },
+            exercises: {
+              select: { exercise: { select: { equipment: true } } },
+            },
+          },
+        },
       },
-    },
-  });
-  const current = await prisma.workoutPlan.findFirst({ where: { userId: user.id, isActive: true, isTemplate: false }, select: { id: true, name: true } });
-  return NextResponse.json({ plans, current });
+    }),
+    prisma.workoutPlan.findFirst({
+      where: { userId: user.id, isActive: true, isTemplate: false },
+      select: { id: true, name: true },
+    }),
+  ]);
+
+  const available = parseEquipment(onboarding?.equipmentJson);
+  const enrichedPlans = plans.map(plan => ({
+    id: plan.id,
+    name: plan.name,
+    templates: plan.templates,
+    equipmentFit: planEquipmentFit(plan, available),
+  }));
+
+  return NextResponse.json({ plans: enrichedPlans, current, equipment: available });
 }
 
 export async function POST(request: Request) {

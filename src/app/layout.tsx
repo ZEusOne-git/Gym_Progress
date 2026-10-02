@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import UserAppShell from "@/components/UserAppShell";
 
 export const metadata: Metadata = {
   title: "Gym Progress",
@@ -10,7 +11,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body><UserAppShell>{children}</UserAppShell></body>
     </html>
   );
 }

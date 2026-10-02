@@ -57,7 +57,7 @@ export async function GET(request: Request) {
     prisma.workoutSession.findFirst({
       where: { userId: user.id, workoutPlanId: plan.id, completedAt: null },
       orderBy: { startedAt: "desc" },
-      select: { id: true, startedAt: true, schedule: { select: { id: true, scheduledDate: true, template: { select: { id: true, dayNumber: true, name: true, estimatedMins: true, exercises: { select: { id: true } } } } } } },
+      select: { id: true, startedAt: true, pausedAt: true, elapsedSeconds: true, schedule: { select: { id: true, scheduledDate: true, template: { select: { id: true, dayNumber: true, name: true, estimatedMins: true, exercises: { select: { id: true } } } } } } },
     }),
   ]);
 

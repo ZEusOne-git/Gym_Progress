@@ -46,20 +46,20 @@ export async function GET(request: Request) {
         scheduledDate: true,
         templateId: true,
         template: { select: { id: true, dayNumber: true, name: true, estimatedMins: true, exercises: { orderBy: { orderIndex: "asc" }, select: { id: true, sets: true, repMin: true, repMax: true, exercise: { select: { name: true } } } } } },
-        session: { select: { id: true, startedAt: true, pausedAt: true, elapsedSeconds: true, completedAt: true } },
+        session: { select: { id: true, startedAt: true, pausedAt: true, elapsedSeconds: true, completedAt: true, endedEarly: true } },
       },
     }),
     prisma.workoutSession.findMany({
       where: { userId: user.id, workoutPlanId: plan.id, startedAt: { gte: from, lt: to } },
       orderBy: { startedAt: "asc" },
-      select: { id: true, startedAt: true, completedAt: true },
+      select: { id: true, startedAt: true, completedAt: true, endedEarly: true },
     }),
     prisma.workoutSession.findFirst({
       where: { userId: user.id, workoutPlanId: plan.id, completedAt: null },
       orderBy: { startedAt: "desc" },
       select: { id: true, startedAt: true, pausedAt: true, elapsedSeconds: true, schedule: { select: { id: true, scheduledDate: true, template: { select: { id: true, dayNumber: true, name: true, estimatedMins: true, exercises: { select: { id: true } } } } } } },
     }),
-    prisma.workoutSession.count({ where: { userId: user.id, completedAt: { not: null } } }),
+    prisma.workoutSession.count({ where: { userId: user.id, completedAt: { not: null }, endedEarly: false } }),
     prisma.weightLog.findFirst({ where: { userId: user.id }, orderBy: { recordedAt: "desc" }, select: { weightKg: true } }),
   ]);
 

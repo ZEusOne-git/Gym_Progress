@@ -8,7 +8,11 @@ type Media = { url: string; type: string; thumbnailUrl: string | null };
 type Exercise = { id: string; sets: number; repMin: number; repMax: number; restSeconds: number; rirTarget?: number | null; targetWeight?: number | null; exercise: { name: string; category: string; media?: Media[] } };
 type Data = { template: { id: string; dayNumber: number; name: string; exercises: Exercise[] }; plan: { name: string } };
 type SetLog = { id?: string; exerciseId: string; setNumber: number; weight: number; reps: number; rir: number | null; completed: boolean };
-type Progression = { recommendation: { weight: number; reps: number; reason: string }; target: { rir: number | null } };
+type Progression = {
+  last: { completedAt: string | null; sets: { setNumber: number; weight: number; reps: number; rir: number | null }[] } | null;
+  recommendation: { weight: number; reps: number; reason: string };
+  target: { sets: number; repMin: number; repMax: number; rir: number | null; increment: number; progressionType: string; weight: number | null };
+};
 type Phase = "ready" | "working" | "rest";
 
 function buildLogs(exercise: Exercise, progression?: Progression): SetLog[] {
@@ -93,6 +97,8 @@ export default function ActiveWorkoutPage() {
   const media = exercise?.exercise.media?.[0] ?? null;
   const progressPercent = totalSets ? Math.round((completedCount / totalSets) * 100) : 0;
   const formatTime = (seconds: number) => `${Math.floor(Math.max(0, seconds) / 60)}:${String(Math.max(0, seconds) % 60).padStart(2, "0")}`;
+  const progression = exercise ? progressions[exercise.id] : undefined;
+  const lastBestSet = progression?.last?.sets?.length ? progression.last.sets.reduce((best, set) => set.weight > best.weight || (set.weight === best.weight && set.reps > best.reps) ? set : best, progression.last.sets[0]) : null;
 
   function updateCurrent(field: "weight" | "reps" | "rir", value: string) {
     if (!exercise || !currentSet || currentSet.completed || phase !== "ready") return;
@@ -170,7 +176,17 @@ export default function ActiveWorkoutPage() {
                   <label className="rounded-2xl bg-white/8 p-3 text-[9px] font-black uppercase tracking-[0.18em] text-white/50">Carico<input aria-label="Peso della serie corrente" disabled={!currentSet || currentSet.completed || phase !== "ready"} type="number" min="0" step="0.5" value={currentSet?.weight ?? 0} onChange={event => updateCurrent("weight", event.target.value)} className="mt-1 w-full bg-transparent text-4xl font-black tracking-[-0.06em] text-white outline-none disabled:opacity-60" /><span className="text-[10px] font-bold normal-case tracking-normal text-white/45">kg</span></label>
                   <label className="rounded-2xl bg-white/8 p-3 text-[9px] font-black uppercase tracking-[0.18em] text-white/50">Ripetizioni<input aria-label="Ripetizioni della serie corrente" disabled={!currentSet || currentSet.completed || phase !== "ready"} type="number" min="0" value={currentSet?.reps ?? exercise.repMin} onChange={event => updateCurrent("reps", event.target.value)} className="mt-1 w-full bg-transparent text-4xl font-black tracking-[-0.06em] text-white outline-none disabled:opacity-60" /><span className="text-[10px] font-bold normal-case tracking-normal text-white/45">reps</span></label>
                 </div>
-                {progressions[exercise.id] && <p className="mt-3 truncate text-[10px] font-bold text-white/55"><span className="font-black text-[var(--accent)]">AUTO</span> · {progressions[exercise.id].recommendation.reason}</p>}
+                {progression && <div className="mt-3 grid grid-cols-2 gap-2">
+                  <div className="rounded-xl border border-white/8 bg-white/5 px-3 py-2.5">
+                    <p className="text-[8px] font-black uppercase tracking-[0.16em] text-white/40">ULTIMA VOLTA</p>
+                    <p className="mt-1 text-sm font-black text-white">{lastBestSet ? `${lastBestSet.weight} kg × ${lastBestSet.reps}` : "Prima sessione"}</p>
+                  </div>
+                  <div className="rounded-xl border border-[var(--accent)]/20 bg-[var(--accent)]/8 px-3 py-2.5">
+                    <p className="text-[8px] font-black uppercase tracking-[0.16em] text-[var(--accent)]">OGGI</p>
+                    <p className="mt-1 text-sm font-black text-white">{progression.recommendation.weight} kg × {progression.recommendation.reps}</p>
+                  </div>
+                  <p className="col-span-2 truncate text-[10px] font-bold text-white/55"><span className="font-black text-[var(--accent)]">AUTO</span> · {progression.recommendation.reason}</p>
+                </div>}
                 <div className="mt-4 flex items-center gap-1.5">{exerciseLogs.map((item, index) => <span key={item.setNumber} className={`h-1.5 flex-1 rounded-full transition-all duration-300 ${item.completed ? "bg-[var(--accent)]" : index === setIndex ? "bg-white" : "bg-white/15"}`} />)}</div>
               </div>}
             </div>

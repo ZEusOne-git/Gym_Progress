@@ -2,9 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Check, ChevronRight, Clock3, Loader2, Play, SkipForward, TimerReset, Trophy } from "lucide-react";
+import { ArrowLeft, Check, ChevronRight, Clock3, Loader2, Play, SkipForward, Trophy } from "lucide-react";
 
-type Media = { url: string; type: string; thumbnailUrl: string | null };
+type Media = { url: string; type: string; thumbnailUrl: string | null; sourceName: string | null };
 type Exercise = { id: string; sets: number; repMin: number; repMax: number; restSeconds: number; rirTarget?: number | null; targetWeight?: number | null; exercise: { name: string; category: string; media?: Media[] } };
 type Data = { template: { id: string; dayNumber: number; name: string; exercises: Exercise[] }; plan: { name: string } };
 type SetLog = { id?: string; exerciseId: string; setNumber: number; weight: number; reps: number; rir: number | null; completed: boolean };
@@ -39,6 +39,7 @@ export default function ActiveWorkoutPage() {
   const [storedElapsed, setStoredElapsed] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
   const [showExitPrompt, setShowExitPrompt] = useState(false);
+  const [poseIndex, setPoseIndex] = useState(0);
   const pauseInFlightRef = useRef(false);
 
   const query = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
@@ -151,11 +152,15 @@ export default function ActiveWorkoutPage() {
   const totalSets = data?.template.exercises.reduce((sum, item) => sum + item.sets, 0) ?? 0;
   const isLastExercise = !!data && exerciseIndex === data.template.exercises.length - 1;
   const isLastSet = !!exercise && setIndex === exercise.sets - 1;
-  const media = exercise?.exercise.media?.[0] ?? null;
+  const exerciseMedia = exercise?.exercise.media ?? [];
+  const repdbPoses = exerciseMedia.filter(item => item.sourceName === "RepDB" && item.type === "IMAGE");
+  const media = repdbPoses[poseIndex] ?? exerciseMedia[0] ?? null;
   const progressPercent = totalSets ? Math.round((completedCount / totalSets) * 100) : 0;
   const formatTime = (seconds: number) => `${Math.floor(Math.max(0, seconds) / 60)}:${String(Math.max(0, seconds) % 60).padStart(2, "0")}`;
   const progression = exercise ? progressions[exercise.id] : undefined;
   const lastBestSet = progression?.last?.sets?.length ? progression.last.sets.reduce((best, set) => set.weight > best.weight || (set.weight === best.weight && set.reps > best.reps) ? set : best, progression.last.sets[0]) : null;
+
+  useEffect(() => setPoseIndex(0), [exercise?.id]);
 
   function updateCurrent(field: "weight" | "reps" | "rir", value: string) {
     if (!exercise || !currentSet || currentSet.completed || phase !== "ready") return;
@@ -257,7 +262,8 @@ export default function ActiveWorkoutPage() {
     {sessionId && (
       <>
         <div key={`${exercise.id}-${exerciseIndex}`} className="absolute inset-0 animate-[fade-in_500ms_ease-out]">
-          {media?.url && media.type !== "IMAGE" ? <video key={media.url} autoPlay muted loop playsInline poster={media.thumbnailUrl ?? undefined} className="absolute inset-0 h-full w-full object-cover" src={media.url} /> : media?.url ? <img src={media.url} alt={exercise.exercise.name} className="absolute inset-0 h-full w-full object-cover" /> : <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(190,255,38,.2),transparent_52%)]" />}
+          {media?.url && media.type !== "IMAGE" && media.type !== "GIF" ? <video key={media.url} autoPlay muted loop playsInline poster={media.thumbnailUrl ?? undefined} className="absolute inset-0 h-full w-full object-cover" src={media.url} /> : media?.url ? <img src={media.url} alt={`${exercise.exercise.name}${repdbPoses.length > 1 ? poseIndex === 0 ? " · posizione iniziale" : " · posizione di picco" : ""}`} className="absolute inset-0 h-full w-full bg-[#0b1513] object-contain" /> : <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(190,255,38,.2),transparent_52%)]" />}
+          {repdbPoses.length > 1 && <button type="button" onClick={() => setPoseIndex(value => value === 0 ? 1 : 0)} className="absolute right-4 top-16 z-10 rounded-full border border-white/20 bg-black/45 px-3 py-2 text-[10px] font-black text-white backdrop-blur-xl">{poseIndex === 0 ? "MOSTRA POSIZIONE FINALE" : "MOSTRA POSIZIONE INIZIALE"}</button>}
           <div className="absolute inset-0 bg-black/25" />
           <div className="absolute inset-0 bg-gradient-to-b from-black/75 via-transparent to-black/90" />
           <div className="absolute inset-x-0 bottom-0 h-[58%] bg-gradient-to-t from-black via-black/35 to-transparent" />
@@ -346,6 +352,6 @@ export default function ActiveWorkoutPage() {
       </>
     )}
 
-    {!sessionId && <div className="relative z-10 flex min-h-[100dvh] items-center justify-center overflow-y-auto px-5 py-8 text-center"><div className="w-full max-w-2xl"><div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[var(--accent)] text-[var(--accent-foreground)]"><Play size={25} fill="currentColor" /></div><p className="mt-7 text-[10px] font-black uppercase tracking-[0.3em] text-[var(--accent)]">PRONTO A PARTIRE?</p><h1 className="mt-3 text-5xl font-black tracking-[-0.06em] sm:text-7xl">{data.template.name}</h1><p className="mx-auto mt-5 max-w-lg text-sm leading-6 text-[var(--muted)]">Carichi e ripetizioni sono già preparati per te. Premi una volta e segui il flusso: serie, recupero ed esercizio successivo.</p><div className="mx-auto mt-8 grid max-w-md grid-cols-3 divide-x divide-[var(--border)] border-y border-[var(--border)] py-4"><div><p className="text-xl font-black">{data.template.exercises.length}</p><p className="mt-1 text-[9px] font-black uppercase tracking-widest text-[var(--muted)]">esercizi</p></div><div><p className="text-xl font-black">{totalSets}</p><p className="mt-1 text-[9px] font-black uppercase tracking-widest text-[var(--muted)]">serie</p></div><div><p className="text-xl font-black">{Math.round(data.template.exercises.reduce((sum, item) => sum + item.restSeconds * item.sets, 0) / 60)}'</p><p className="mt-1 text-[9px] font-black uppercase tracking-widest text-[var(--muted)]">recupero</p></div></div><button type="button" onClick={startWorkout} disabled={saving} className="mx-auto mt-9 inline-flex min-h-14 w-full max-w-md items-center justify-center gap-2 rounded-full bg-[var(--accent)] px-7 py-4 text-sm font-black text-[var(--accent-foreground)] shadow-[0_14px_35px_rgba(190,255,38,.14)] transition-all duration-200 active:scale-[0.98] disabled:opacity-60">{saving ? "AVVIO..." : "INIZIA ALLENAMENTO"}<ChevronRight size={18}/></button></div></div>}
+    {!sessionId && <div className="relative z-10 flex min-h-[100dvh] items-center justify-center overflow-y-auto px-5 py-8 text-center"><div className="w-full max-w-2xl"><div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[var(--accent)] text-[var(--accent-foreground)]"><Play size={25} fill="currentColor" /></div><p className="mt-7 text-[10px] font-black uppercase tracking-[0.3em] text-[var(--accent)]">PRONTO A PARTIRE?</p><h1 className="mt-3 text-5xl font-black tracking-[-0.06em] sm:text-7xl">{data.template.name}</h1><p className="mx-auto mt-5 max-w-lg text-sm leading-6 text-[var(--muted)]">Carichi e ripetizioni sono già preparati per te. Premi una volta e segui il flusso: serie, recupero ed esercizio successivo.</p><div className="mx-auto mt-8 grid max-w-md grid-cols-3 divide-x divide-[var(--border)] border-y border-[var(--border)] py-4"><div><p className="text-xl font-black">{data.template.exercises.length}</p><p className="mt-1 text-[9px] font-black uppercase tracking-widest text-[var(--muted)]">esercizi</p></div><div><p className="text-xl font-black">{totalSets}</p><p className="mt-1 text-[9px] font-black uppercase tracking-widest text-[var(--muted)]">serie</p></div><div><p className="text-xl font-black">{Math.round(data.template.exercises.reduce((sum, item) => sum + item.restSeconds * item.sets, 0) / 60)} min</p><p className="mt-1 text-[9px] font-black uppercase tracking-widest text-[var(--muted)]">recupero</p></div></div><button type="button" onClick={startWorkout} disabled={saving} className="mx-auto mt-9 inline-flex min-h-14 w-full max-w-md items-center justify-center gap-2 rounded-full bg-[var(--accent)] px-7 py-4 text-sm font-black text-[var(--accent-foreground)] shadow-[0_14px_35px_rgba(190,255,38,.14)] transition-all duration-200 active:scale-[0.98] disabled:opacity-60">{saving ? "AVVIO..." : "INIZIA ALLENAMENTO"}<ChevronRight size={18}/></button></div></div>}
   </main>;
 }

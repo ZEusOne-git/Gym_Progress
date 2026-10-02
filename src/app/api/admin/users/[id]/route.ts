@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { recordAudit } from "@/lib/audit";
 
 async function requireAdmin() {
   const user = await getCurrentUser();
@@ -118,7 +119,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 }
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  if (!await requireAdmin()) return NextResponse.json({ error: "Non autorizzato" }, { status: 403 });
+  const admin = await requireAdmin();
+  if (!admin) return NextResponse.json({ error: "Non autorizzato" }, { status: 403 });
   const { id } = await params;
   const body = await request.json().catch(() => ({}));
   const templatePlanId = typeof body.templatePlanId === "string" ? body.templatePlanId : "";
@@ -199,6 +201,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (dates.length) await tx.workoutSchedule.createMany({ data: dates });
     return created;
   });
+
+  await recordAudit({ userId: admin.id, action: "ASSIGN", entity: "WorkoutPlan", entityId: plan.id, metadata: { userId: user.id, name: plan.name } });
 
   return NextResponse.json({
     plan,

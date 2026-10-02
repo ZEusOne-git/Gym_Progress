@@ -1,8 +1,17 @@
 import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
+if (process.env.NODE_ENV === "production") {
+  console.log("Production mode: skipped demo workout plans.");
+  await prisma.$disconnect();
+  process.exit(0);
+}
 const programName = "TEST · 4 GIORNI · SETTIMANA COMPLETA";
-const demoEmail = "atleta@test.it";
+const demoEmail = process.env.DEMO_EMAIL?.trim().toLowerCase();
+if (!demoEmail) {
+  await prisma.$disconnect();
+  throw new Error("Set DEMO_EMAIL to create the optional development test plan.");
+}
 
 const exerciseData = [
   ["bench-press", "Bench Press", "CHEST", "CHEST · TRICEPS", ["BARBELL", "BENCH"]],
@@ -53,7 +62,7 @@ for (const old of oldPlans) {
   await prisma.workoutPlan.delete({ where: { id: old.id } });
 }
 
-const template = await prisma.workoutPlan.create({
+await prisma.workoutPlan.create({
   data: {
     name: programName,
     version: 1,

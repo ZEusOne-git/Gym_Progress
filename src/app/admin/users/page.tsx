@@ -45,7 +45,7 @@ export default function AdminUsersPage() {
           <div>
             <p className="mb-2 text-xs font-black uppercase tracking-[.2em] text-[var(--accent)]">People</p>
             <h1 className="text-3xl font-black tracking-tight md:text-4xl">Utenti</h1>
-            <p className="mt-2 max-w-xl text-sm text-[var(--muted)]">Panoramica degli utenti dell'app, del programma assegnato e dell'attività registrata.</p>
+            <p className="mt-2 max-w-xl text-sm text-[var(--muted)]">Panoramica degli utenti dell&apos;app, del programma assegnato e dell&apos;attività registrata.</p>
           </div>
           <div className="flex items-center gap-2 rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-sm font-bold"><Users size={18}/>{users.length} utenti</div>
         </div>

@@ -1,11 +1,25 @@
 {
   "name": "Gym Progress",
   "short_name": "Gym Progress",
-  "description": "Personalized training and progress tracking",
+  "description": "Allenamento personalizzato e monitoraggio dei progressi",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#071615",
   "theme_color": "#071615",
   "orientation": "portrait",
-  "icons": []
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["fitness", "health"]
 }

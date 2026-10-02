@@ -7,8 +7,6 @@ import { CalendarDays, CheckCircle2, Clock3, Users } from "lucide-react";
 type Session = { id: string; startedAt: string; completedAt: string | null; user: { id: string; email: string; profile: { firstName: string | null } | null }; plan: { id: string; name: string } };
 
 function dayKey(value: string | Date) { const d = typeof value === "string" ? new Date(value) : value; return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; }
-function initials(s: Session) { return (s.user.profile?.firstName?.trim() || s.user.email.split("@")[0]).slice(0,1).toUpperCase(); }
-
 export default function AdminCalendarPage() {
   const [sessions,setSessions]=useState<Session[]>([]); const [loading,setLoading]=useState(true); const [error,setError]=useState(""); const [cursor,setCursor]=useState(()=>new Date()); const [selected,setSelected]=useState(dayKey(new Date()));
   useEffect(()=>{fetch("/api/admin/calendar").then(async r=>{const d=await r.json();if(!r.ok)throw new Error(d.error||"Errore calendario");return d.sessions}).then(setSessions).catch(e=>setError(e.message)).finally(()=>setLoading(false))},[]);

@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
+import { workoutPlanInput } from "@/lib/workout-plan-input";
+import { recordAudit } from "@/lib/audit";
 
 async function requireAdmin() { const user = await getCurrentUser(); if (!user || (user.role !== "ADMIN" && user.role !== "SUPER_ADMIN")) return null; return user; }
 
@@ -16,12 +18,35 @@ export async function GET() {
 export async function POST(request: Request) {
   const user = await requireAdmin(); if (!user) return NextResponse.json({ error: "Non autorizzato" }, { status: 403 });
   try {
-    const body = await request.json(); const name = typeof body.name === "string" ? body.name.trim() : ""; const days = Array.isArray(body.days) ? body.days : [];
-    if (!name || days.length === 0) return NextResponse.json({ error: "Inserisci il nome del programma e almeno un giorno." }, { status: 400 });
-    if (days.some((day: any) => !Array.isArray(day?.exercises) || day.exercises.length === 0)) return NextResponse.json({ error: "Ogni giorno deve contenere almeno un esercizio." }, { status: 400 });
-    const exerciseIds = Array.from(new Set(days.flatMap((day: any) => day.exercises.map((item: any) => item?.exerciseId).filter(Boolean)))) as string[];
+    const parsed = workoutPlanInput.safeParse(await request.json());
+    if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Programma non valido." }, { status: 400 });
+    const { name, days } = parsed.data;
+    const exerciseIds = Array.from(new Set(days.flatMap(day => day.exercises.map(item => item.exerciseId))));
     const valid = await prisma.exercise.findMany({ where: { id: { in: exerciseIds }, isActive: true }, select: { id: true } }); const validIds = new Set(valid.map(e => e.id)); if (exerciseIds.some(id => !validIds.has(id))) return NextResponse.json({ error: "Uno o più esercizi selezionati non sono più disponibili nella Library." }, { status: 400 });
-    const plan = await prisma.$transaction(async tx => { const created = await tx.workoutPlan.create({ data: { userId: null, name, isTemplate: true } }); for (let dayIndex=0; dayIndex<days.length; dayIndex++){const day=days[dayIndex]??{};const template=await tx.workoutTemplate.create({data:{workoutPlanId:created.id,dayNumber:dayIndex+1,name:typeof day.name==="string"&&day.name.trim()?day.name.trim():`Day ${dayIndex+1}`,estimatedMins:Number(day.estimatedMins)>0?Math.round(Number(day.estimatedMins)):null}});const items=Array.isArray(day.exercises)?day.exercises:[];for(let i=0;i<items.length;i++){const item=items[i]??{};const repMin=Math.max(1,Number(item.repMin)||1);await tx.workoutExercise.create({data:{templateId:template.id,exerciseId:item.exerciseId,orderIndex:i,sets:Math.max(1,Number(item.sets)||1),repMin,repMax:Math.max(repMin,Number(item.repMax)||repMin),rirTarget:item.rirTarget===""||item.rirTarget==null?null:Number(item.rirTarget),restSeconds:Math.max(0,Number(item.restSeconds)||0),setType:typeof item.setType==="string"?item.setType:"NORMAL",progressionType:typeof item.progressionType==="string"?item.progressionType:"DOUBLE_PROGRESSION",loadIncrement:item.loadIncrement===""||item.loadIncrement==null?null:Number(item.loadIncrement),tempo:typeof item.tempo==="string"&&item.tempo.trim()?item.tempo.trim():null,targetWeight:item.targetWeight===""||item.targetWeight==null?null:Number(item.targetWeight),notes:typeof item.notes==="string"&&item.notes.trim()?item.notes.trim():null}})}}return tx.workoutPlan.findUnique({where:{id:created.id},include:{templates:{include:{exercises:true},orderBy:{dayNumber:"asc"}}}}); });
+    const plan = await prisma.$transaction(async tx => {
+      const created = await tx.workoutPlan.create({ data: { userId: null, name, isTemplate: true, isActive: false } });
+      for (const [dayIndex, day] of days.entries()) {
+        const template = await tx.workoutTemplate.create({ data: { workoutPlanId: created.id, dayNumber: dayIndex + 1, name: day.name, estimatedMins: day.estimatedMins ?? null } });
+        await tx.workoutExercise.createMany({ data: day.exercises.map((item, orderIndex) => ({
+          templateId: template.id,
+          exerciseId: item.exerciseId,
+          orderIndex,
+          sets: item.sets,
+          repMin: item.repMin,
+          repMax: item.repMax,
+          rirTarget: item.rirTarget,
+          restSeconds: item.restSeconds,
+          setType: item.setType,
+          progressionType: item.progressionType,
+          loadIncrement: item.loadIncrement,
+          tempo: item.tempo?.trim() || null,
+          targetWeight: item.targetWeight,
+          notes: item.notes?.trim() || null,
+        })) });
+      }
+      return tx.workoutPlan.findUnique({ where: { id: created.id }, include: { templates: { include: { exercises: true }, orderBy: { dayNumber: "asc" } } } });
+    });
+    if (plan) await recordAudit({ userId: user.id, action: "CREATE", entity: "WorkoutPlan", entityId: plan.id, metadata: { name: plan.name } });
     return NextResponse.json(plan,{status:201});
   } catch(error){console.error("[admin/workouts POST]",error);return NextResponse.json({error:`Impossibile salvare il programma: ${error instanceof Error?error.message:"Errore"}`},{status:500});}
 }

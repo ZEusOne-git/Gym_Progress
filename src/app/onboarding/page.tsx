@@ -110,7 +110,7 @@ export default function OnboardingPage() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error ?? "Unable to save your progress.");
       if (editing && completed) window.location.href = "/profile";
-      else if (completed) window.location.href = "/dashboard";
+      else if (completed) window.location.href = "/programs";
       else setStep((current) => current + 1);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Unable to save your progress.");
@@ -152,7 +152,7 @@ export default function OnboardingPage() {
           {error && <div className="mt-4 rounded-2xl border border-red-400/30 bg-red-400/10 px-4 py-3 text-sm font-semibold text-red-300">{error}</div>}
         </section>
 
-        <button disabled={saving} onClick={next} className="mt-8 flex w-full items-center justify-center gap-2 rounded-2xl bg-[var(--accent)] px-5 py-4 font-black text-[var(--accent-foreground)] disabled:cursor-not-allowed disabled:opacity-60">{saving ? "SALVATAGGIO..." : editing && step === steps.length - 1 ? "SALVA MODIFICHE" : step === steps.length - 1 ? "CREA IL MIO PIANO" : "CONTINUA"}<ArrowRight size={18} /></button>
+        <button disabled={saving} onClick={next} className="mt-8 flex w-full items-center justify-center gap-2 rounded-2xl bg-[var(--accent)] px-5 py-4 font-black text-[var(--accent-foreground)] disabled:cursor-not-allowed disabled:opacity-60">{saving ? "SALVATAGGIO..." : editing && step === steps.length - 1 ? "SALVA MODIFICHE" : step === steps.length - 1 ? "SCEGLI IL MIO PROGRAMMA" : "CONTINUA"}<ArrowRight size={18} /></button>
       </div>
     </main>
   );

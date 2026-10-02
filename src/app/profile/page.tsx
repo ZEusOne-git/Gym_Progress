@@ -67,6 +67,13 @@ export default async function ProfilePage() {
           })()}
         />
 
+        <section className="mt-5 rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-5 py-4">
+          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--muted)]">Crediti contenuti</p>
+          <a href="https://repdb.co" target="_blank" rel="noreferrer" className="mt-2 inline-flex text-sm font-bold text-[var(--accent)] underline-offset-4 hover:underline">
+            Exercise data by RepDB (repdb.co)
+          </a>
+        </section>
+
         <section className="mt-5">
           <form action="/api/auth/logout" method="post">
             <button
@@ -74,7 +81,7 @@ export default async function ProfilePage() {
               className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border border-red-400/20 bg-red-400/5 px-4 py-3.5 text-sm font-black text-red-200 transition hover:bg-red-400/10 active:scale-[.99]"
             >
               <LogOut size={17} />
-              Esci dall'account
+              Esci dall&apos;account
             </button>
           </form>
         </section>

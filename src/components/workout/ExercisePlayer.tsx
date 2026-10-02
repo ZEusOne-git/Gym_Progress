@@ -65,7 +65,7 @@ export default function ExercisePlayer({ exercise, exerciseIndex, totalExercises
         <div className="relative min-h-0 flex-1 bg-black">
           {exercise.mediaUrl ? (
             exercise.mediaType === "IMAGE" || exercise.mediaType === "GIF" ? (
-              <img src={exercise.mediaUrl} alt={exercise.name} className="h-full w-full object-contain" />
+              <img src={exercise.mediaUrl} alt={exercise.name} className="h-full w-full bg-[#0b1513] object-contain" />
             ) : (
               <video
                 ref={videoRef}

@@ -83,7 +83,7 @@ export default function ProgramsPage() {
           <p className="text-[10px] font-black tracking-[0.3em] text-[var(--accent)]">PROGRAMMI</p>
           <h1 className="mt-2 max-w-2xl text-4xl font-black tracking-[-0.055em] sm:text-5xl">Scegli il tuo percorso.</h1>
           <p className="mt-3 max-w-2xl text-sm leading-6 text-[var(--muted)]">
-            Ogni programma prepara automaticamente le tue sessioni. Tu devi solo aprire l'allenamento e seguirlo.
+            Ogni programma prepara automaticamente le tue sessioni. Tu devi solo aprire l&apos;allenamento e seguirlo.
           </p>
         </header>
 

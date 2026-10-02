@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
+import { recordAudit } from "@/lib/audit";
 
 async function requireAdmin() {
   const user = await getCurrentUser();
@@ -21,5 +22,6 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (!target) return NextResponse.json({ error: "Utente non trovato" }, { status: 404 });
   }
   const updated = await prisma.workoutPlan.update({ where: { id }, data: { userId }, select: { id: true, userId: true, name: true } });
+  await recordAudit({ userId: admin.id, action: "ASSIGN", entity: "WorkoutPlanTemplate", entityId: id, metadata: { userId, name: updated.name } });
   return NextResponse.json(updated);
 }

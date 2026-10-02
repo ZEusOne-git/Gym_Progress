@@ -30,7 +30,7 @@ export async function GET(request: Request) {
     ? await prisma.workoutSession.findFirst({
         where: { userId: user.id, scheduleId: schedule.id, completedAt: null },
         orderBy: { startedAt: "desc" },
-        select: { id: true, startedAt: true, sets: { orderBy: [{ exerciseId: "asc" }, { setNumber: "asc" }], select: { id: true, exerciseId: true, setNumber: true, weight: true, reps: true, rir: true, completed: true } } },
+        select: { id: true, startedAt: true, pausedAt: true, elapsedSeconds: true, sets: { orderBy: [{ exerciseId: "asc" }, { setNumber: "asc" }], select: { id: true, exerciseId: true, setNumber: true, weight: true, reps: true, rir: true, completed: true } } },
       })
     : await prisma.workoutSession.findFirst({
         where: { userId: user.id, completedAt: null, plan: { isActive: true, isTemplate: false, templates: { some: { id: templateId } } } },
@@ -57,15 +57,38 @@ export async function POST(request: Request) {
       : null;
 
     if (schedule) {
-      const existingScheduled = await prisma.workoutSession.findUnique({ where: { scheduleId: schedule.id }, select: { id: true, userId: true, startedAt: true, completedAt: true } });
-      if (existingScheduled?.userId === user.id && !existingScheduled.completedAt) return NextResponse.json({ session: existingScheduled });
+      const existingScheduled = await prisma.workoutSession.findUnique({ where: { scheduleId: schedule.id }, select: { id: true, userId: true, startedAt: true, pausedAt: true, elapsedSeconds: true, completedAt: true } });
+      if (existingScheduled?.userId === user.id && !existingScheduled.completedAt) {
+        if (existingScheduled.pausedAt) {
+          const resumed = await prisma.workoutSession.update({
+            where: { id: existingScheduled.id },
+            data: { startedAt: new Date(), pausedAt: null },
+            select: { id: true, startedAt: true, pausedAt: true, elapsedSeconds: true },
+          });
+          return NextResponse.json({ session: resumed, resumed: true });
+        }
+        return NextResponse.json({ session: existingScheduled });
+      }
       if (existingScheduled?.completedAt) return NextResponse.json({ error: "Questo allenamento è già stato completato." }, { status: 409 });
     } else {
       const open = await prisma.workoutSession.findFirst({ where: { userId: user.id, workoutPlanId: template.workoutPlanId, completedAt: null }, orderBy: { startedAt: "desc" } });
-      if (open) return NextResponse.json({ session: open });
+      if (open) {
+        if (open.pausedAt) {
+          const resumed = await prisma.workoutSession.update({
+            where: { id: open.id },
+            data: { startedAt: new Date(), pausedAt: null },
+            select: { id: true, startedAt: true, pausedAt: true, elapsedSeconds: true },
+          });
+          return NextResponse.json({ session: resumed, resumed: true });
+        }
+        return NextResponse.json({ session: open });
+      }
     }
 
-    const session = await prisma.workoutSession.create({ data: { userId: user.id, workoutPlanId: template.workoutPlanId, scheduleId: schedule?.id ?? null } });
+    const session = await prisma.workoutSession.create({
+      data: { userId: user.id, workoutPlanId: template.workoutPlanId, scheduleId: schedule?.id ?? null },
+      select: { id: true, startedAt: true, pausedAt: true, elapsedSeconds: true },
+    });
     return NextResponse.json({ session }, { status: 201 });
   } catch (error) {
     console.error("[workouts/session POST]", error);
@@ -79,6 +102,7 @@ export async function PATCH(request: Request) {
   try {
     const body = await request.json();
     const sessionId = typeof body.sessionId === "string" ? body.sessionId : "";
+    const action = body.action === "pause" ? "pause" : "complete";
     if (!sessionId) return NextResponse.json({ error: "Sessione non valida." }, { status: 400 });
 
     const session = await prisma.workoutSession.findFirst({
@@ -90,6 +114,29 @@ export async function PATCH(request: Request) {
       },
     });
     if (!session) return NextResponse.json({ error: "Sessione non trovata." }, { status: 404 });
+
+    if (action === "pause") {
+      if (session.pausedAt) {
+        return NextResponse.json({
+          ok: true,
+          paused: true,
+          session: { id: session.id, startedAt: session.startedAt, pausedAt: session.pausedAt, elapsedSeconds: session.elapsedSeconds },
+        });
+      }
+
+      const now = new Date();
+      const additionalSeconds = Math.max(0, Math.floor((now.getTime() - session.startedAt.getTime()) / 1000));
+      const paused = await prisma.workoutSession.update({
+        where: { id: session.id },
+        data: { pausedAt: now, elapsedSeconds: { increment: additionalSeconds } },
+        select: { id: true, startedAt: true, pausedAt: true, elapsedSeconds: true },
+      });
+      return NextResponse.json({ ok: true, paused: true, session: paused });
+    }
+
+    if (session.pausedAt) {
+      return NextResponse.json({ error: "Allenamento in pausa. Riprendilo prima di completarlo." }, { status: 400 });
+    }
 
     const currentTemplate = session.schedule?.template ?? (() => {
       const sessionExerciseIds = new Set(session.sets.map(set => set.exerciseId));
@@ -108,7 +155,13 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "Completa tutte le serie prima di chiudere l'allenamento." }, { status: 400 });
     }
 
-    const updated = await prisma.workoutSession.update({ where: { id: sessionId }, data: { completedAt: new Date() }, select: { id: true, completedAt: true } });
+    const now = new Date();
+    const additionalSeconds = Math.max(0, Math.floor((now.getTime() - session.startedAt.getTime()) / 1000));
+    const updated = await prisma.workoutSession.update({
+      where: { id: sessionId },
+      data: { completedAt: now, elapsedSeconds: { increment: additionalSeconds } },
+      select: { id: true, completedAt: true, elapsedSeconds: true },
+    });
     return NextResponse.json({ ok: true, session: updated });
   } catch (error) {
     console.error("[workouts/session PATCH]", error);

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { ArrowLeft, ArrowRight, Check, Dumbbell, Target, UserRound, CalendarDays, HeartPulse, Ruler, Sparkles } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 
 const steps = [
   { title: "About you", icon: UserRound },
@@ -40,6 +41,8 @@ type FormState = {
 const emptyForm: FormState = { name: "", age: "", sex: "", weight: "", height: "", goal: "", experience: "", days: "4", priorities: [], running: "", notes: "" };
 
 export default function OnboardingPage() {
+  const searchParams = useSearchParams();
+  const editing = searchParams.get("edit") === "1";
   const [step, setStep] = useState(0);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [loading, setLoading] = useState(true);
@@ -61,7 +64,7 @@ export default function OnboardingPage() {
       })
       .then((data) => {
         if (!active || !data) return;
-        if (data.completed) {
+        if (data.completed && !editing) {
           window.location.href = "/dashboard";
           return;
         }
@@ -104,7 +107,8 @@ export default function OnboardingPage() {
       const response = await fetch("/api/onboarding", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...form, completed }) });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error ?? "Unable to save your progress.");
-      if (completed) window.location.href = "/dashboard";
+      if (editing && completed) window.location.href = "/profile";
+      else if (completed) window.location.href = "/dashboard";
       else setStep((current) => current + 1);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Unable to save your progress.");
@@ -121,9 +125,9 @@ export default function OnboardingPage() {
     <main className="min-h-screen">
       <div className="mx-auto flex min-h-screen w-full max-w-md flex-col px-5 pb-7 pt-6">
         <header className="mb-7 flex items-center gap-3">
-          {step === 0 ? <Link href="/register" aria-label="Back" className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--surface)] text-[var(--muted)]"><ArrowLeft size={18} /></Link> : <button onClick={() => setStep((current) => current - 1)} aria-label="Back" className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--surface)] text-[var(--muted)]"><ArrowLeft size={18} /></button>}
+          {step === 0 ? <Link href={editing ? "/profile" : "/register"} aria-label="Back" className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--surface)] text-[var(--muted)]"><ArrowLeft size={18} /></Link> : <button onClick={() => setStep((current) => current - 1)} aria-label="Back" className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--surface)] text-[var(--muted)]"><ArrowLeft size={18} /></button>}
           <div className="flex-1">
-            <div className="mb-2 flex items-center justify-between text-xs font-bold text-[var(--muted)]"><span>PERSONAL SETUP</span><span>{step + 1} / {steps.length}</span></div>
+            <div className="mb-2 flex items-center justify-between text-xs font-bold text-[var(--muted)]"><span>{editing ? "MODIFICA PROFILO" : "PERSONAL SETUP"}</span><span>{step + 1} / {steps.length}</span></div>
             <div className="h-1.5 overflow-hidden rounded-full bg-[var(--surface)]"><div className="h-full rounded-full bg-[var(--accent)] transition-all" style={{ width: `${progress}%` }} /></div>
           </div>
         </header>
@@ -146,7 +150,7 @@ export default function OnboardingPage() {
           {error && <div className="mt-4 rounded-2xl border border-red-400/30 bg-red-400/10 px-4 py-3 text-sm font-semibold text-red-300">{error}</div>}
         </section>
 
-        <button disabled={saving} onClick={next} className="mt-8 flex w-full items-center justify-center gap-2 rounded-2xl bg-[var(--accent)] px-5 py-4 font-black text-[var(--accent-foreground)] disabled:cursor-not-allowed disabled:opacity-60">{saving ? "SAVING..." : step === steps.length - 1 ? "BUILD MY PLAN" : "CONTINUE"}<ArrowRight size={18} /></button>
+        <button disabled={saving} onClick={next} className="mt-8 flex w-full items-center justify-center gap-2 rounded-2xl bg-[var(--accent)] px-5 py-4 font-black text-[var(--accent-foreground)] disabled:cursor-not-allowed disabled:opacity-60">{saving ? "SALVATAGGIO..." : editing && step === steps.length - 1 ? "SALVA MODIFICHE" : step === steps.length - 1 ? "CREA IL MIO PIANO" : "CONTINUA"}<ArrowRight size={18} /></button>
       </div>
     </main>
   );

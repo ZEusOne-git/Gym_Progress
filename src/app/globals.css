@@ -30,157 +30,57 @@ button { cursor: pointer; }
 a { color: inherit; text-decoration: none; }
 ::selection { background: var(--accent); color: var(--accent-foreground); }
 
-/* Shared contrast-safe button primitives. Never rely on inherited text color. */
-.btn-accent,
-button.btn-accent,
-a.btn-accent {
-  background: var(--accent) !important;
-  color: var(--accent-foreground) !important;
-}
-.btn-dark,
-button.btn-dark,
-a.btn-dark {
-  background: var(--dark-button) !important;
-  color: var(--dark-button-foreground) !important;
-}
-.btn-surface,
-button.btn-surface,
-a.btn-surface {
-  background: var(--surface-strong) !important;
-  color: var(--foreground) !important;
-}
-.btn-outline,
-button.btn-outline,
-a.btn-outline {
-  background: transparent !important;
-  border: 1px solid var(--foreground);
-  color: var(--foreground) !important;
-}
+.btn-accent, button.btn-accent, a.btn-accent { background: var(--accent) !important; color: var(--accent-foreground) !important; }
+.btn-dark, button.btn-dark, a.btn-dark { background: var(--dark-button) !important; color: var(--dark-button-foreground) !important; }
+.btn-surface, button.btn-surface, a.btn-surface { background: var(--surface-strong) !important; color: var(--foreground) !important; }
+.btn-outline, button.btn-outline, a.btn-outline { background: transparent !important; border: 1px solid var(--foreground); color: var(--foreground) !important; }
+.btn-outline-on-accent, button.btn-outline-on-accent, a.btn-outline-on-accent { background: transparent !important; border: 1px solid var(--accent-foreground) !important; color: var(--accent-foreground) !important; }
+.btn-outline-on-accent:hover, button.btn-outline-on-accent:hover, a.btn-outline-on-accent:hover { background: color-mix(in srgb, var(--accent-foreground) 8%, transparent) !important; }
 
-/* Outline controls placed on the fluorescent accent panel must use dark ink. */
-.btn-outline-on-accent,
-button.btn-outline-on-accent,
-a.btn-outline-on-accent {
-  background: transparent !important;
-  border: 1px solid var(--accent-foreground) !important;
-  color: var(--accent-foreground) !important;
-}
-.btn-outline-on-accent:hover,
-button.btn-outline-on-accent:hover,
-a.btn-outline-on-accent:hover {
-  background: color-mix(in srgb, var(--accent-foreground) 8%, transparent) !important;
-}
-
-/* Any element with an explicit accent background must always use dark text. */
-button[class*="bg-[var(--accent)]"],
-a[class*="bg-[var(--accent)]"],
-button[class*="bg-[var(--accent)]"] *,
-a[class*="bg-[var(--accent)]"] *,
-button[class*="bg-lime-"],
-a[class*="bg-lime-"],
-button[class*="bg-lime-"] *,
-a[class*="bg-lime-"] *,
-button[class*="bg-yellow-"],
-a[class*="bg-yellow-"],
-button[class*="bg-yellow-"] *,
-a[class*="bg-yellow-"] * {
-  color: var(--accent-foreground) !important;
-}
-
-/* Dark/black controls always use light text. */
-button[class*="bg-[var(--dark-button)]"],
-a[class*="bg-[var(--dark-button)]"],
-button[class*="bg-black"],
-a[class*="bg-black"],
-button[class*="bg-zinc-900"],
-a[class*="bg-zinc-900"],
-button[class*="bg-neutral-900"],
-a[class*="bg-neutral-900"] {
-  color: var(--dark-button-foreground) !important;
-}
-
-/* White/light controls use dark text. */
-button[class*="bg-white"],
-a[class*="bg-white"],
-button[class*="bg-gray-50"],
-a[class*="bg-gray-50"],
-button[class*="bg-slate-50"],
-a[class*="bg-slate-50"] {
-  color: var(--dark-button) !important;
-}
-
-/* Safety net for legacy fluorescent buttons. */
-[class*="bg-[var(--accent)]"],
-[class*="bg-lime-"],
-[class*="bg-yellow-"] {
-  color: var(--accent-foreground) !important;
-}
+button[class*="bg-[var(--accent)]"], a[class*="bg-[var(--accent)]"], button[class*="bg-[var(--accent)]"] *, a[class*="bg-[var(--accent)]"] *, button[class*="bg-lime-"], a[class*="bg-lime-"], button[class*="bg-lime-"] *, a[class*="bg-lime-"] *, button[class*="bg-yellow-"], a[class*="bg-yellow-"], button[class*="bg-yellow-"] *, a[class*="bg-yellow-"] * { color: var(--accent-foreground) !important; }
+button[class*="bg-[var(--dark-button)]"], a[class*="bg-[var(--dark-button)]"], button[class*="bg-black"], a[class*="bg-black"], button[class*="bg-zinc-900"], a[class*="bg-zinc-900"], button[class*="bg-neutral-900"], a[class*="bg-neutral-900"] { color: var(--dark-button-foreground) !important; }
+button[class*="bg-white"], a[class*="bg-white"], button[class*="bg-gray-50"], a[class*="bg-gray-50"], button[class*="bg-slate-50"], a[class*="bg-slate-50"] { color: var(--dark-button) !important; }
+[class*="bg-[var(--accent)]"], [class*="bg-lime-"], [class*="bg-yellow-"] { color: var(--accent-foreground) !important; }
 
 .btn-accent:hover, .btn-dark:hover, .btn-surface:hover, .btn-outline:hover, .btn-outline-on-accent:hover { filter: brightness(1.06); }
 .btn-accent:disabled, .btn-dark:disabled, .btn-surface:disabled, .btn-outline:disabled, .btn-outline-on-accent:disabled { cursor: not-allowed; opacity: .5; filter: none; }
 
-/* Motion primitives: interactions should feel physical, not like a page of static boxes. */
-button, a {
-  -webkit-tap-highlight-color: transparent;
-}
-button:active:not(:disabled), a:active {
-  transform: translateY(1px) scale(.985);
-}
-button:focus-visible, a:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 3px;
-}
+button, a { -webkit-tap-highlight-color: transparent; }
+button:active:not(:disabled), a:active { transform: translateY(1px) scale(.985); }
+button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 
-/* Mobile calendar: a continuous date rail, with the selected day carrying the visual weight. */
-[data-calendar-card] {
-  scroll-snap-stop: always;
-  will-change: transform, opacity;
-  transition: width 420ms cubic-bezier(.22,1,.36,1), opacity 420ms cubic-bezier(.22,1,.36,1), transform 420ms cubic-bezier(.22,1,.36,1);
-}
-[data-calendar-card] > div {
-  transition: transform 420ms cubic-bezier(.22,1,.36,1), background-color 420ms ease, border-color 420ms ease, box-shadow 420ms ease, color 240ms ease;
-}
-[data-calendar-card]:not(:has(> div.border-[var\(--accent\)])):hover > div {
-  transform: translateY(-2px);
-}
+/* Premium motion primitives used by the workout and calendar experiences. */
+@keyframes gp-enter-up { from { opacity: 0; transform: translate3d(0, 18px, 0) scale(.985); } to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); } }
+@keyframes gp-enter-right { from { opacity: 0; transform: translate3d(42px, 0, 0); } to { opacity: 1; transform: translate3d(0, 0, 0); } }
+@keyframes gp-enter-left { from { opacity: 0; transform: translate3d(-42px, 0, 0); } to { opacity: 1; transform: translate3d(0, 0, 0); } }
+@keyframes gp-pulse-accent { 0%,100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 0%, transparent); } 50% { box-shadow: 0 0 0 10px color-mix(in srgb, var(--accent) 10%, transparent); } }
+@keyframes gp-progress { from { transform: scaleX(0); transform-origin: left; } to { transform: scaleX(1); transform-origin: left; } }
+
+.gp-enter-up { animation: gp-enter-up 420ms cubic-bezier(.22,1,.36,1) both; }
+.gp-enter-right { animation: gp-enter-right 420ms cubic-bezier(.22,1,.36,1) both; }
+.gp-enter-left { animation: gp-enter-left 420ms cubic-bezier(.22,1,.36,1) both; }
+.gp-pulse-accent { animation: gp-pulse-accent 1.8s cubic-bezier(.22,1,.36,1) infinite; }
+.gp-progress { animation: gp-progress 650ms cubic-bezier(.22,1,.36,1) both; }
+
+/* Interactive surfaces: depth comes from movement and restraint, not piles of cards. */
+.gp-interactive { transition: transform 320ms cubic-bezier(.22,1,.36,1), opacity 220ms ease, box-shadow 320ms cubic-bezier(.22,1,.36,1), border-color 220ms ease; will-change: transform; }
+.gp-interactive:hover { transform: translateY(-2px); }
+.gp-interactive:active { transform: translateY(0) scale(.99); }
+
+/* Calendar rail. */
+[data-calendar-card] { scroll-snap-stop: always; will-change: transform, opacity; transition: width 420ms cubic-bezier(.22,1,.36,1), opacity 420ms cubic-bezier(.22,1,.36,1), transform 420ms cubic-bezier(.22,1,.36,1); }
+[data-calendar-card] > div { transition: transform 420ms cubic-bezier(.22,1,.36,1), background-color 420ms ease, border-color 420ms ease, box-shadow 420ms ease, color 240ms ease; }
+[data-calendar-card]:not(:has(> div.border-[var\(--accent\)])):hover > div { transform: translateY(-2px); }
 
 @media (max-width: 639px) {
-  [data-calendar-card] {
-    width: 58px !important;
-    opacity: .48;
-  }
-  [data-calendar-card]:has(> div.bg-\[var\(--accent\)\]) {
-    width: 96px !important;
-    opacity: 1;
-    z-index: 2;
-    transform: scale(1.02);
-  }
-  [data-calendar-card] > div {
-    height: 92px !important;
-    border-radius: 22px !important;
-    background: color-mix(in srgb, var(--surface) 88%, transparent) !important;
-    border-color: color-mix(in srgb, var(--border) 75%, transparent) !important;
-    box-shadow: none !important;
-  }
-  [data-calendar-card]:has(> div.bg-\[var\(--accent\)]) > div {
-    height: 104px !important;
-    border-width: 0 !important;
-    background: var(--accent) !important;
-    box-shadow: 0 18px 40px color-mix(in srgb, var(--accent) 18%, transparent) !important;
-  }
-  [data-calendar-card] > div span:last-child {
-    max-width: 76px;
-    font-size: 8px;
-    letter-spacing: .08em;
-  }
+  [data-calendar-card] { width: 58px !important; opacity: .48; }
+  [data-calendar-card]:has(> div.bg-\[var\(--accent\)\]) { width: 96px !important; opacity: 1; z-index: 2; transform: scale(1.02); }
+  [data-calendar-card] > div { height: 92px !important; border-radius: 22px !important; background: color-mix(in srgb, var(--surface) 88%, transparent) !important; border-color: color-mix(in srgb, var(--border) 75%, transparent) !important; box-shadow: none !important; }
+  [data-calendar-card]:has(> div.bg-\[var\(--accent\)]) > div { height: 104px !important; border-width: 0 !important; background: var(--accent) !important; box-shadow: 0 18px 40px color-mix(in srgb, var(--accent) 18%, transparent) !important; }
+  [data-calendar-card] > div span:last-child { max-width: 76px; font-size: 8px; letter-spacing: .08em; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
-  *, *::before, *::after {
-    animation-duration: .01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: .01ms !important;
-    scroll-behavior: auto !important;
-  }
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
 }

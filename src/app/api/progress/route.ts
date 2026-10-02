@@ -12,7 +12,7 @@ export async function GET() {
     prisma.workoutSet.findMany({ where: { session: { userId: user.id, completedAt: { not: null } }, completed: true }, orderBy: { timestamp: "desc" }, take: 1000, select: { id: true, exerciseId: true, setNumber: true, weight: true, reps: true, rir: true, timestamp: true } }),
     prisma.weightLog.findMany({ where: { userId: user.id }, orderBy: { recordedAt: "asc" }, take: 60, select: { id: true, weightKg: true, recordedAt: true } }),
     prisma.workoutSession.count({ where: { userId: user.id, completedAt: { not: null } } }),
-    prisma.workoutSession.findMany({ where: { userId: user.id, completedAt: { not: null }, completedAt: { gte: recentWindowStart } }, select: { completedAt: true } }),
+    prisma.workoutSession.findMany({ where: { userId: user.id, completedAt: { gte: recentWindowStart } }, select: { completedAt: true } }),
   ]);
   const exerciseIds = [...new Set(sets.map(s => s.exerciseId))];
   const exercises = exerciseIds.length ? await prisma.exercise.findMany({ where: { id: { in: exerciseIds } }, select: { id: true, name: true } }) : [];

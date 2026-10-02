@@ -11,11 +11,11 @@ function defaultWeekdays(templateCount: number, trainingDays: number | null) {
   const count = Math.max(1, Math.min(templateCount, 7));
   const presets: Record<number, number[]> = {
     1: [1],
-    2: [1, 4],
+    2: [1, 5],
     3: [1, 3, 5],
-    4: [1, 2, 4, 6],
-    5: [1, 2, 3, 5, 6],
-    6: [1, 2, 3, 4, 5, 6],
+    4: [1, 3, 5, 7],
+    5: [1, 2, 4, 5, 7],
+    6: [1, 2, 3, 4, 5, 7],
     7: [1, 2, 3, 4, 5, 6, 7],
   };
   const preferred = trainingDays && trainingDays === count ? trainingDays : count;
@@ -31,7 +31,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       id: true, email: true, role: true, createdAt: true,
       profile: { select: { firstName: true, age: true, currentWeight: true, targetWeight: true, heightCm: true, experience: true, trainingDays: true, sessionMinutes: true } },
       onboarding: { select: { primaryGoal: true, completedAt: true } },
-      plans: { where: { isActive: true }, orderBy: { updatedAt: "desc" }, take: 1, select: { id: true, name: true, updatedAt: true, templates: { orderBy: { dayNumber: "asc" }, select: { id: true, dayNumber: true, name: true, estimatedMins: true, exercises: { orderBy: { orderIndex: "asc" }, select: { id: true, orderIndex: true, sets: true, repMin: true, repMax: true, exercise: { select: { name: true } } } } } } } },
+      plans: { where: { isActive: true }, orderBy: { updatedAt: "desc" }, take: 1, select: { id: true, name: true, updatedAt: true, templates: { orderBy: { dayNumber: "asc" }, select: { id: true, dayNumber: true, name: true, estimatedMins: true, exercises: { orderBy: { orderIndex: "asc" }, select: { id: true, orderIndex: true, sets: true, repMin: true, repMax: true, exercise: { select: { name: true } } } } } } },
       sessionsLog: { orderBy: { startedAt: "desc" }, take: 10, select: { id: true, startedAt: true, completedAt: true, plan: { select: { name: true } } } },
       weightLogs: { orderBy: { recordedAt: "desc" }, take: 12, select: { id: true, weightKg: true, recordedAt: true } },
     },
@@ -63,14 +63,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   const weekdays = defaultWeekdays(source.templates.length, user.profile?.trainingDays ?? null);
   const weekdayLabels = ["Dom", "Lun", "Mar", "Mer", "Gio", "Ven", "Sab"];
-  const scheduleStart = new Date();
-  scheduleStart.setHours(12, 0, 0, 0);
-  const monday = new Date(scheduleStart);
-  const currentDay = monday.getDay() || 7;
-  monday.setDate(monday.getDate() - currentDay + 1);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const nextMonday = new Date(today);
+  const daysUntilMonday = ((8 - (today.getDay() || 7)) % 7) || 7;
+  nextMonday.setDate(today.getDate() + daysUntilMonday);
+  nextMonday.setHours(12, 0, 0, 0);
 
   const plan = await prisma.$transaction(async tx => {
-    await tx.workoutSchedule.deleteMany({ where: { userId: user.id, scheduledDate: { gte: scheduleStart }, session: { is: null } } });
+    await tx.workoutSchedule.deleteMany({ where: { userId: user.id, scheduledDate: { gte: today }, session: { is: null } } });
     await tx.workoutPlan.updateMany({ where: { userId: user.id, isActive: true }, data: { isActive: false } });
     const created = await tx.workoutPlan.create({
       data: {
@@ -95,10 +96,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     for (let week = 0; week < 12; week++) {
       for (let index = 0; index < created.templates.length; index++) {
         const weekday = weekdays[index];
-        const scheduledDate = new Date(monday);
-        scheduledDate.setDate(monday.getDate() + week * 7 + (weekday - 1));
+        const scheduledDate = new Date(nextMonday);
+        scheduledDate.setDate(nextMonday.getDate() + week * 7 + (weekday - 1));
         scheduledDate.setHours(12, 0, 0, 0);
-        if (scheduledDate < scheduleStart) continue;
         dates.push({ userId: user.id, workoutPlanId: created.id, templateId: created.templates[index].id, scheduledDate });
       }
     }
@@ -112,6 +112,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       weeks: 12,
       weekdays,
       labels: weekdays.map(day => weekdayLabels[day]),
+      startsOn: nextMonday.toISOString(),
     },
   }, { status: 201 });
 }

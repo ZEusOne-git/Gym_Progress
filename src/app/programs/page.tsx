@@ -14,6 +14,12 @@ type Plan = {
     estimatedMins: number | null;
     _count: { exercises: number };
   }[];
+  equipmentFit?: {
+    total: number;
+    compatible: number;
+    unsupported: string[];
+    percent: number;
+  };
 };
 
 export default function ProgramsPage() {
@@ -125,6 +131,14 @@ export default function ProgramsPage() {
                       <p className="mt-2 text-sm text-[var(--muted)]">
                         {plan.templates.length} giorni di allenamento · {totalExercises} esercizi
                       </p>
+                      {plan.equipmentFit ? (
+                        <div className="mt-3 flex flex-wrap items-center gap-2 text-[10px] font-black uppercase tracking-[0.14em]">
+                          <span className={plan.equipmentFit.unsupported.length ? "text-amber-300" : "text-[var(--accent)]"}>
+                            {plan.equipmentFit.unsupported.length ? `${plan.equipmentFit.percent}% compatibile con i tuoi attrezzi` : "Compatibile con i tuoi attrezzi"}
+                          </span>
+                          {plan.equipmentFit.unsupported.length ? <span className="text-[var(--muted)]">· {plan.equipmentFit.unsupported.length} requisito non coperto</span> : null}
+                        </div>
+                      ) : null}
                     </div>
                     {active && (
                       <span className="shrink-0 rounded-full bg-[var(--accent)] px-3 py-1.5 text-[9px] font-black text-[var(--accent-foreground)]">

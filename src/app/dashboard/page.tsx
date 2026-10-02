@@ -7,8 +7,8 @@ import { CalendarDays, Dumbbell, Flame, Play, TrendingUp, UserRound } from "luci
 type Data = { plan: { id: string; name: string; templates: { id: string; dayNumber: number; name: string; estimatedMins: number | null; exercises: { id: string; sets: number; repMin: number; repMax: number; exercise: { name: string } }[] }[] } | null; sessions: { id: string; startedAt: string; completedAt: string | null }[]; nextSchedule: { id: string; scheduledDate: string; template: { id: string; dayNumber: number; name: string; estimatedMins: number | null; exercises: { id: string }[] } } | null };
 
 export default function DashboardPage() {
-  const [user, setUser] = useState<{ firstName: string } | null>(null); const [data, setData] = useState<Data | null>(null); const [loading, setLoading] = useState(true);
-  useEffect(() => { fetch("/api/auth/me").then(r => r.json()).then(d => { if (!d.user) { window.location.href = "/login?next=/dashboard"; return; } if (!d.user.onboarding?.completedAt) { window.location.href = "/onboarding"; return; } setUser({ firstName: d.user.profile?.firstName?.trim() || "Athlete" }); }); }, []);
+  const [user, setUser] = useState<{ firstName: string; role: string } | null>(null); const [data, setData] = useState<Data | null>(null); const [loading, setLoading] = useState(true);
+  useEffect(() => { fetch("/api/auth/me").then(r => r.json()).then(d => { if (!d.user) { window.location.href = "/login?next=/dashboard"; return; } const role = d.user.role || "USER"; if (role === "USER" && !d.user.onboarding?.completedAt) { window.location.href = "/onboarding"; return; } setUser({ firstName: d.user.profile?.firstName?.trim() || "Athlete", role }); }); }, []);
   useEffect(() => { const now = new Date(); fetch(`/api/workouts/dashboard?year=${now.getFullYear()}&month=${now.getMonth()}`).then(r => r.json()).then(setData).finally(() => setLoading(false)); }, []);
   if (!user) return <main className="min-h-screen p-8 text-sm text-[var(--muted)]">Caricamento...</main>;
   const next = data?.nextSchedule;

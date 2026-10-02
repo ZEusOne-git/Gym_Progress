@@ -11,19 +11,23 @@ const items = [
   ["Profilo", "/profile", UserRound],
 ] as const;
 
-function isUserArea(pathname: string) {
-  return items.some(([href]) => pathname === href || pathname.startsWith(`${href}/`));
+function shouldShowNav(pathname: string) {
+  if (pathname.startsWith("/admin")) return false;
+  if (pathname.startsWith("/login") || pathname.startsWith("/register")) return false;
+  if (pathname.startsWith("/onboarding")) return false;
+  if (pathname.startsWith("/workout")) return false;
+  return pathname === "/dashboard" || pathname.startsWith("/dashboard/") || pathname === "/calendar" || pathname.startsWith("/calendar/") || pathname === "/progress" || pathname.startsWith("/progress/") || pathname === "/profile" || pathname.startsWith("/profile/") || pathname === "/programs" || pathname.startsWith("/programs/");
 }
 
 export default function UserAppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const showNav = isUserArea(pathname);
+  const showNav = shouldShowNav(pathname);
 
   return (
     <>
       <div className={showNav ? "pb-28 md:pb-8" : ""}>{children}</div>
       {showNav && (
-        <nav aria-label="Navigazione principale" className="fixed inset-x-0 bottom-4 z-50 mx-auto flex w-[calc(100%-1.5rem)] max-w-md rounded-[28px] border border-[var(--border)] bg-[var(--surface)]/90 p-2 shadow-2xl backdrop-blur-2xl">
+        <nav aria-label="Navigazione principale" className="fixed bottom-4 left-1/2 z-[100] w-[calc(100%-1.5rem)] max-w-md -translate-x-1/2 rounded-[28px] border border-[var(--border)] bg-[var(--surface)]/90 p-2 shadow-2xl backdrop-blur-2xl">
           <div className="grid w-full grid-cols-4 gap-1">
             {items.map(([label, href, Icon]) => {
               const active = pathname === href || (href !== "/dashboard" && pathname.startsWith(`${href}/`));

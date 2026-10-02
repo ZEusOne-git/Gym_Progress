@@ -114,7 +114,7 @@ export default function CalendarPage() {
   const selectedSchedule = schedules.get(selectedKey) ?? null;
   const completed = Boolean(selectedSchedule?.session?.completedAt);
   const isToday = sameDay(selected, today);
-  const carouselDays = useMemo(() => [-2, -1, 0, 1, 2].map(offset => addDays(selected, offset)), [selectedKey]);
+  const carouselDays = useMemo(() => [addDays(selected, -1), selected, addDays(selected, 1)], [selectedKey]);
 
   function move(days: number) {
     if (animating) return;
@@ -134,7 +134,7 @@ export default function CalendarPage() {
     if (animating) return;
     const width = carouselRef.current?.getBoundingClientRect().width ?? window.innerWidth;
     setAnimating(true);
-    dragXRef.current = direction * -(width / 5);
+    dragXRef.current = direction * -(width / 3);
     setDragX(dragXRef.current);
     window.setTimeout(() => {
       setSelected(current => addDays(current, direction));
@@ -203,13 +203,13 @@ export default function CalendarPage() {
 
         <div ref={carouselRef} className="relative mt-7 overflow-hidden border-y border-[var(--border)] py-5 select-none touch-pan-y overscroll-contain" onPointerDown={e => { if (e.pointerType === "mouse" && e.buttons !== 1) return; e.currentTarget.setPointerCapture(e.pointerId); startPointer(e.clientX); }} onPointerMove={e => movePointer(e.clientX)} onPointerUp={finishSwipe} onPointerCancel={finishSwipe}>
           <div className="pointer-events-none absolute inset-y-0 left-1/3 z-0 w-1/3 bg-[var(--surface)]/20 blur-2xl" />
-          <div className="relative z-10 flex h-[112px] w-[125%] items-center will-change-transform" style={{ transform: `translate3d(calc(-12.5% + ${dragX}px),0,0)`, transition: dragging ? "none" : spring }}>
+          <div className="relative z-10 flex h-[112px] w-full items-center will-change-transform" style={{ transform: `translate3d(${dragX}px,0,0)`, transition: dragging ? "none" : spring }}>
             {carouselDays.map((day, index) => {
               const schedule = schedules.get(keyOf(day));
               const active = index === 1;
               const done = Boolean(schedule?.session?.completedAt);
               const todayDay = sameDay(day, today);
-              return <button key={keyOf(day)} type="button" onClick={() => selectDay(day)} className="flex h-full w-1/5 shrink-0 flex-col items-center justify-center outline-none" aria-current={active ? "date" : undefined}>
+              return <button key={keyOf(day)} type="button" onClick={() => selectDay(day)} className="flex h-full w-1/3 shrink-0 flex-col items-center justify-center outline-none" aria-current={active ? "date" : undefined}>
                 <span className={`text-[10px] font-black uppercase tracking-[0.16em] transition-opacity duration-300 ${active ? "text-[var(--foreground)]" : "text-[var(--muted)] opacity-70"}`}>{day.toLocaleDateString("it-IT", { weekday: "short" }).replace(".", "")}</span>
                 <span className={`mt-2 flex h-14 w-14 items-center justify-center rounded-full text-2xl font-black leading-none transition-all duration-300 ${active ? "bg-[var(--accent)] text-[var(--accent-foreground)] shadow-[0_10px_35px_rgba(190,255,38,.22)]" : "text-[var(--foreground)]"}`}>{day.getDate()}</span>
                 <span className={`mt-3 h-1.5 w-1.5 rounded-full transition-all duration-300 ${done ? "bg-[var(--accent)]" : schedule ? "bg-[var(--accent)]/60" : "bg-[var(--border)]"}`} />

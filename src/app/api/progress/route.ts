@@ -16,6 +16,12 @@ export async function GET() {
   const hydratedSets = sets.map(s => ({ ...s, exercise: { name: exerciseNames.get(s.exerciseId) ?? "Esercizio" } }));
   const weekly = Array.from({ length: 8 }, (_, i) => { const end = new Date(); end.setHours(23,59,59,999); end.setDate(end.getDate() - i * 7); const start = new Date(end); start.setDate(start.getDate() - 6); const count = sessions.filter(s => s.completedAt && new Date(s.completedAt) >= start && new Date(s.completedAt) <= end).length; return { label: start.toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit" }), count }; }).reverse();
   const bestByExercise = new Map<string, { name: string; weight: number; reps: number; volume: number }>();
-  for (const set of hydratedSets) { const volume = set.weight * set.reps; const old = bestByExercise.get(set.exerciseId); if (!old || volume > old.volume) bestByExercise.set(set.exerciseId, { name: set.exercise.name, weight: set.weight, reps: set.reps, volume }); }
-  return NextResponse.json({ sessions, sets: hydratedSets.slice(0, 60), weights, weekly, records: Array.from(bestByExercise.values()).sort((a,b) => b.volume - a.volume).slice(0, 6) });
+  const historyMap = new Map<string, { id: string; weight: number; reps: number; rir: number | null; timestamp: string }[]>();
+  for (const set of hydratedSets) {
+    const volume = set.weight * set.reps; const old = bestByExercise.get(set.exerciseId);
+    if (!old || volume > old.volume) bestByExercise.set(set.exerciseId, { name: set.exercise.name, weight: set.weight, reps: set.reps, volume });
+    const history = historyMap.get(set.exerciseId) ?? []; history.push({ id: set.id, weight: set.weight, reps: set.reps, rir: set.rir, timestamp: set.timestamp }); historyMap.set(set.exerciseId, history);
+  }
+  const exerciseHistory = exercises.map(e => ({ id: e.id, name: e.name, sets: (historyMap.get(e.id) ?? []).sort((a,b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()).slice(-12) })).filter(e => e.sets.length);
+  return NextResponse.json({ sessions, sets: hydratedSets.slice(0, 60), weights, weekly, records: Array.from(bestByExercise.values()).sort((a,b) => b.volume - a.volume).slice(0, 6), exerciseHistory });
 }

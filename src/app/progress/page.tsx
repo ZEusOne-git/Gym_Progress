@@ -5,12 +5,12 @@ import { useEffect, useMemo, useState } from "react";
 import { ArrowUpRight, BarChart3, Scale, Trophy, Dumbbell, ChevronRight } from "lucide-react";
 
 type HistoryPoint = { id: string; weight: number; reps: number; rir: number | null; timestamp: string };
-type Data = { sessions: { id: string; startedAt: string; completedAt: string | null; plan: { name: string } }[]; sets: { id: string; exerciseId: string; setNumber: number; weight: number; reps: number; rir: number | null; timestamp: string; exercise: { name: string } }[]; weights: { id: string; weightKg: number; recordedAt: string }[]; weekly: { label: string; count: number }[]; records: { name: string; weight: number; reps: number; volume: number }[]; exerciseHistory: { id: string; name: string; sets: HistoryPoint[] }[] };
+type Data = { sessionCount: number; sessions: { id: string; startedAt: string; completedAt: string | null; plan: { name: string } }[]; sets: { id: string; exerciseId: string; setNumber: number; weight: number; reps: number; rir: number | null; timestamp: string; exercise: { name: string } }[]; weights: { id: string; weightKg: number; recordedAt: string }[]; weekly: { label: string; count: number }[]; records: { name: string; weight: number; reps: number; volume: number }[]; exerciseHistory: { id: string; name: string; sets: HistoryPoint[] }[] };
 
 export default function ProgressPage() {
   const [data, setData] = useState<Data | null>(null); const [loading, setLoading] = useState(true); const [selectedExercise, setSelectedExercise] = useState("");
-  useEffect(() => { fetch("/api/progress").then(async r => { const d = await r.json(); if (!r.ok) throw new Error(d.error || "Errore"); return d; }).then(d => { setData(d); setSelectedExercise(d.exerciseHistory?.[0]?.id || ""); }).catch(() => setData({ sessions: [], sets: [], weights: [], weekly: [], records: [], exerciseHistory: [] })).finally(() => setLoading(false)); }, []);
-  const sessions = data?.sessions.length ?? 0;
+  useEffect(() => { fetch("/api/progress").then(async r => { const d = await r.json(); if (!r.ok) throw new Error(d.error || "Errore"); return d; }).then(d => { setData(d); setSelectedExercise(d.exerciseHistory?.[0]?.id || ""); }).catch(() => setData({ sessionCount: 0, sessions: [], sets: [], weights: [], weekly: [], records: [], exerciseHistory: [] })).finally(() => setLoading(false)); }, []);
+  const sessions = data?.sessionCount ?? data?.sessions.length ?? 0;
   const current = data?.weights.at(-1)?.weightKg;
   const previous = data?.weights.length && data.weights.length > 1 ? data.weights[data.weights.length - 2].weightKg : undefined;
   const change = current != null && previous != null ? current - previous : null;

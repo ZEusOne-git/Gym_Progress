@@ -30,19 +30,23 @@ button { cursor: pointer; }
 a { color: inherit; text-decoration: none; }
 ::selection { background: var(--accent); color: var(--accent-foreground); }
 
-/* Shared contrast-safe button primitives. Use these instead of pairing arbitrary
-   background/text utilities so the label always remains readable. */
+/* Shared contrast-safe button primitives. Never rely on inherited text color. */
 .btn-accent {
   background: var(--accent);
-  color: var(--accent-foreground);
+  color: var(--accent-foreground) !important;
 }
 .btn-dark {
   background: var(--dark-button);
-  color: var(--dark-button-foreground);
+  color: var(--dark-button-foreground) !important;
 }
 .btn-surface {
   background: var(--surface-strong);
-  color: var(--foreground);
+  color: var(--foreground) !important;
 }
-.btn-accent:hover, .btn-dark:hover, .btn-surface:hover { filter: brightness(1.06); }
-.btn-accent:disabled, .btn-dark:disabled, .btn-surface:disabled { cursor: not-allowed; opacity: .5; filter: none; }
+.btn-outline {
+  background: transparent;
+  border: 1px solid var(--foreground);
+  color: var(--foreground) !important;
+}
+.btn-accent:hover, .btn-dark:hover, .btn-surface:hover, .btn-outline:hover { filter: brightness(1.06); }
+.btn-accent:disabled, .btn-dark:disabled, .btn-surface:disabled, .btn-outline:disabled { cursor: not-allowed; opacity: .5; filter: none; }

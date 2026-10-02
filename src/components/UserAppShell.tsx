@@ -32,7 +32,17 @@ export default function UserAppShell({ children }: { children: React.ReactNode }
             {items.map(([label, href, Icon]) => {
               const active = pathname === href || (href !== "/dashboard" && pathname.startsWith(`${href}/`));
               return (
-                <Link key={href} href={href} aria-current={active ? "page" : undefined} className={`flex min-h-12 flex-col items-center justify-center gap-1 rounded-[20px] px-2 text-[10px] font-black transition active:scale-95 ${active ? "bg-[var(--foreground)] text-[var(--background)]" : "text-[var(--muted)] hover:bg-[var(--background)]/50 hover:text-[var(--foreground)]"}`}>
+                <Link
+                  key={href}
+                  href={href}
+                  aria-current={active ? "page" : undefined}
+                  className={[
+                    "flex min-h-12 flex-col items-center justify-center gap-1 rounded-[20px] px-2 text-[10px] font-black transition active:scale-95",
+                    active
+                      ? "bg-[var(--accent)] text-[var(--accent-foreground)] shadow-[0_8px_24px_rgba(190,255,38,.16)]"
+                      : "text-[var(--muted)] hover:bg-[var(--background)]/50 hover:text-[var(--foreground)]",
+                  ].join(" ")}
+                >
                   <Icon size={17} strokeWidth={active ? 2.5 : 2} />
                   <span>{label}</span>
                 </Link>

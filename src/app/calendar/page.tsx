@@ -159,7 +159,7 @@ export default function CalendarPage() {
 
         <div ref={carouselRef} className="relative mt-7 overflow-hidden border-y border-[var(--border)] py-5 select-none touch-pan-y" onPointerDown={e => { if (e.pointerType === "mouse" && e.buttons !== 1) return; e.currentTarget.setPointerCapture(e.pointerId); startPointer(e.clientX); }} onPointerMove={e => movePointer(e.clientX)} onPointerUp={finishSwipe} onPointerCancel={finishSwipe}>
           <div className="pointer-events-none absolute inset-y-0 left-1/3 z-0 w-1/3 bg-[var(--surface)]/20 blur-2xl" />
-          <div className="relative z-10 flex h-[112px] w-[300%] items-center will-change-transform" style={{ transform: `translate3d(calc(-33.333333% + ${dragX}px),0,0)`, transition: dragging ? "none" : spring }}>
+          <div className="relative z-10 flex h-[112px] w-full items-center will-change-transform" style={{ transform: `translate3d(${dragX}px,0,0)`, transition: dragging ? "none" : spring }}>
             {carouselDays.map((day, index) => {
               const schedule = schedules.get(keyOf(day));
               const active = index === 1;

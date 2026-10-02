@@ -36,6 +36,8 @@ export default function ActiveWorkoutPage() {
   const [error, setError] = useState("");
   const [finished, setFinished] = useState(false);
   const [startedAt, setStartedAt] = useState<string | null>(null);
+  const [storedElapsed, setStoredElapsed] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
 
   const query = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
   const templateId = query?.get("template");
@@ -49,7 +51,11 @@ export default function ActiveWorkoutPage() {
     ]).then(([workout, active]) => {
       setData(workout);
       if (!active.session) return;
-      setSessionId(active.session.id); setStartedAt(active.session.startedAt);
+      setSessionId(active.session.id);
+      setStartedAt(active.session.startedAt);
+      setStoredElapsed(active.session.elapsedSeconds ?? 0);
+      setElapsed(active.session.elapsedSeconds ?? 0);
+      setIsPaused(Boolean(active.session.pausedAt));
       const grouped: Record<string, SetLog[]> = {};
       for (const item of active.session.sets) (grouped[item.exerciseId] ??= []).push(item);
       setLogs(grouped);
@@ -62,10 +68,25 @@ export default function ActiveWorkoutPage() {
 
   useEffect(() => {
     if (!sessionId) return;
+    if (isPaused) {
+      setElapsed(storedElapsed);
+      return;
+    }
     const started = startedAt ? new Date(startedAt).getTime() : Date.now();
-    const tick = () => setElapsed(Math.max(0, Math.floor((Date.now() - started) / 1000)));
-    tick(); const interval = window.setInterval(tick, 1000); return () => window.clearInterval(interval);
-  }, [sessionId, startedAt]);
+    const tick = () => setElapsed(storedElapsed + Math.max(0, Math.floor((Date.now() - started) / 1000)));
+    tick();
+    const interval = window.setInterval(tick, 1000);
+    return () => window.clearInterval(interval);
+  }, [sessionId, startedAt, storedElapsed, isPaused]);
+
+  useEffect(() => {
+    if (!sessionId || isPaused || finished) return;
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "hidden") void pauseWorkout(true);
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", onVisibilityChange);
+  }, [sessionId, isPaused, finished, storedElapsed]);
 
   useEffect(() => {
     if (phase !== "working" && phase !== "rest") return;
@@ -105,13 +126,54 @@ export default function ActiveWorkoutPage() {
     setLogs(previous => ({ ...previous, [exercise.id]: (previous[exercise.id] ?? exerciseLogs).map(item => item.setNumber === currentSet.setNumber ? { ...item, [field]: field === "rir" ? (value === "" ? null : Number(value)) : Number(value) } : item) }));
   }
 
+  async function pauseWorkout(silent = false) {
+    if (!sessionId || isPaused || finished) return;
+    try {
+      const response = await fetch("/api/workouts/session", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ sessionId, action: "pause" }),
+        keepalive: true,
+      });
+      const json = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(json?.error || "Impossibile mettere in pausa l'allenamento.");
+      if (json?.session) {
+        setStoredElapsed(json.session.elapsedSeconds ?? storedElapsed);
+        setElapsed(json.session.elapsedSeconds ?? storedElapsed);
+      }
+      setIsPaused(true);
+      setPhase("ready");
+      setTimer(0);
+      if (!silent) setError("");
+    } catch (errorValue) {
+      if (!silent) setError(errorValue instanceof Error ? errorValue.message : "Impossibile mettere in pausa l'allenamento.");
+    }
+  }
+
+  async function exitWorkout() {
+    if (!sessionId) {
+      window.location.href = "/calendar";
+      return;
+    }
+    setSaving(true);
+    await pauseWorkout();
+    window.location.href = "/calendar";
+  }
+
   async function startWorkout() {
-    if (!templateId || sessionId || saving) return;
+    if (!templateId || saving || (sessionId && !isPaused)) return;
     setSaving(true); setError("");
     try {
       const response = await fetch("/api/workouts/session", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ templateId, date: scheduledDate }) });
       const json = await response.json(); if (!response.ok) throw new Error(json.error || "Impossibile avviare l'allenamento.");
-      setSessionId(json.session.id); setStartedAt(json.session.startedAt); setExerciseIndex(0); setSetIndex(0); setPhase("ready"); setElapsed(0);
+      setSessionId(json.session.id);
+      setStartedAt(json.session.startedAt);
+      setStoredElapsed(json.session.elapsedSeconds ?? 0);
+      setIsPaused(false);
+      setExerciseIndex(0);
+      setSetIndex(0);
+      setPhase("ready");
+      setElapsed(json.session.elapsedSeconds ?? 0);
     } catch (errorValue) { setError(errorValue instanceof Error ? errorValue.message : "Errore"); } finally { setSaving(false); }
   }
 
@@ -159,7 +221,7 @@ export default function ActiveWorkoutPage() {
 
         <div className="relative z-10 flex h-full min-h-0 flex-col px-4 pb-[max(16px,env(safe-area-inset-bottom))] pt-[max(12px,env(safe-area-inset-top))] sm:px-7">
           <header className="flex shrink-0 items-center justify-between gap-3">
-            <Link href="/calendar" className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/15 bg-black/25 text-white backdrop-blur-xl transition active:scale-90" aria-label="Esci dal workout"><ArrowLeft size={19} /></Link>
+            <button type="button" onClick={() => void exitWorkout()} disabled={saving} className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/15 bg-black/25 text-white backdrop-blur-xl transition active:scale-90 disabled:opacity-50" aria-label="Metti in pausa ed esci dal workout"><ArrowLeft size={19} /></button>
             <div className="min-w-0 flex-1 text-center"><p className="truncate text-[9px] font-black uppercase tracking-[0.24em] text-white/60">{data.plan.name}</p><p className="mt-1 text-xs font-black">{exerciseIndex + 1} / {data.template.exercises.length} · GIORNO {data.template.dayNumber}</p></div>
             <div className="flex shrink-0 items-center gap-1.5 rounded-full border border-white/15 bg-black/25 px-3 py-2 text-xs font-black tabular-nums backdrop-blur-xl"><Clock3 size={13} className="text-[var(--accent)]" /> {formatTime(elapsed)}</div>
           </header>
@@ -195,6 +257,22 @@ export default function ActiveWorkoutPage() {
           {phase !== "rest" && <div className="shrink-0 pt-2 sm:pt-4"><button type="button" onClick={phase === "working" ? completeSet : beginSet} disabled={saving || !currentSet} className={`inline-flex min-h-[58px] w-full items-center justify-center gap-2 rounded-[1.15rem] px-6 py-4 text-sm font-black shadow-2xl transition duration-200 active:scale-[.985] disabled:opacity-60 ${phase === "working" ? "bg-[var(--accent)] text-[var(--accent-foreground)] shadow-[0_14px_45px_rgba(190,255,38,.22)]" : "bg-white !text-black shadow-black/30"}`}>{phase === "working" ? <><Check size={18} strokeWidth={3}/> {saving ? "SALVATAGGIO..." : isLastSet && isLastExercise ? "COMPLETA ALLENAMENTO" : "COMPLETA SERIE"}</> : <><Play size={18} fill="currentColor"/> INIZIA SERIE</>}</button></div>}
           {error && <p className="mt-2 shrink-0 rounded-xl border border-red-300/20 bg-red-500/15 px-3 py-2 text-center text-xs font-bold text-white">{error}</p>}
         </div>
+
+        {isPaused && (
+          <div className="absolute inset-0 z-40 grid place-items-center bg-black/70 p-6 backdrop-blur-md">
+            <div className="w-full max-w-sm text-center">
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[var(--accent)] text-[var(--accent-foreground)]">
+                <Clock3 size={25} />
+              </div>
+              <p className="mt-6 text-[10px] font-black uppercase tracking-[0.28em] text-[var(--accent)]">ALLENAMENTO IN PAUSA</p>
+              <h2 className="mt-2 text-4xl font-black tracking-[-0.055em]">Tempo fermato.</h2>
+              <p className="mt-3 text-sm leading-6 text-white/60">Il tempo riparte solo quando riprendi il workout.</p>
+              <button type="button" onClick={() => void startWorkout()} disabled={saving} className="mt-7 inline-flex min-h-14 w-full items-center justify-center gap-2 rounded-full bg-[var(--accent)] px-6 py-4 text-sm font-black text-[var(--accent-foreground)] transition active:scale-[.98] disabled:opacity-60">
+                {saving ? "RIPRESA..." : "RIPRENDI ALLENAMENTO"}<ChevronRight size={18} />
+              </button>
+            </div>
+          </div>
+        )}
       </>
     )}
 

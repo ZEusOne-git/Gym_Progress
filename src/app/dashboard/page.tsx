@@ -27,7 +27,7 @@ export default function DashboardPage() {
   const active = data?.activeSession;
   const workoutTarget = next?.template;
   const workoutHref = workoutTarget ? `/workout?day=${workoutTarget.dayNumber}&date=${next?.scheduledDate.slice(0, 10)}` : "/calendar";
-  const completed = data?.summary.completedCount ?? 0;
+  const completed = data?.summary?.completedCount ?? 0;
   const currentWeight = data?.summary?.currentWeight;
   const planDays = data?.plan?.templates.length ?? 0;
   const todayLabel = next ? new Date(next.scheduledDate).toLocaleDateString("it-IT", { weekday: "long", day: "numeric", month: "long" }) : null;

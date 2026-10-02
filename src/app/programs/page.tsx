@@ -78,7 +78,7 @@ export default function ProgramsPage() {
         </header>
 
         {activePlan && (
-          <section className="mt-8 overflow-hidden rounded-[2rem] border border-[var(--accent)]/25 bg-[var(--accent)]/10 p-5 sm:p-7">
+          <section className="mt-8 border-y border-[var(--accent)]/25 py-5 sm:py-7">
             <div className="flex items-start gap-3">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[var(--accent)] text-[var(--accent-foreground)]">
                 <Check size={18} strokeWidth={3} />
@@ -112,11 +112,9 @@ export default function ProgramsPage() {
             return (
               <article
                 key={plan.id}
-                className={"overflow-hidden rounded-[2rem] border bg-[var(--surface)] transition duration-300 " + (active
-                  ? "border-[var(--accent)]/35 shadow-[0_16px_50px_rgba(0,0,0,.10)]"
-                  : "border-[var(--border)] hover:-translate-y-0.5 hover:border-[var(--foreground)]/20")}
+                className={"border-y border-[var(--border)] transition-colors duration-300 " + (active ? "border-y-[var(--accent)]/35" : "")}
               >
-                <div className="p-5 sm:p-7">
+                <div className="py-5 sm:py-7">
                   <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--accent)]">
@@ -156,7 +154,7 @@ export default function ProgramsPage() {
                       type="button"
                       onClick={() => choose(plan.id)}
                       disabled={saving !== null}
-                      className="mt-5 flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[var(--accent)] px-5 py-3.5 text-sm font-black text-[var(--accent-foreground)] transition active:scale-[.985] disabled:cursor-wait disabled:opacity-60"
+                      className="mt-5 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-5 py-3.5 text-sm font-black text-[var(--accent-foreground)] transition active:scale-[.985] disabled:cursor-wait disabled:opacity-60"
                     >
                       {saving === plan.id ? "AGGIORNAMENTO..." : "SCEGLI PROGRAMMA"}
                     </button>
@@ -174,9 +172,9 @@ export default function ProgramsPage() {
         )}
 
         {loading && (
-          <div className="mt-8 animate-pulse space-y-4">
-            <div className="h-52 rounded-[2rem] bg-[var(--surface)]" />
-            <div className="h-52 rounded-[2rem] bg-[var(--surface)]" />
+          <div className="mt-8 animate-pulse space-y-2">
+            <div className="h-28 border-y border-[var(--border)] bg-[var(--surface)]/30" />
+            <div className="h-28 border-y border-[var(--border)] bg-[var(--surface)]/30" />
           </div>
         )}
       </div>

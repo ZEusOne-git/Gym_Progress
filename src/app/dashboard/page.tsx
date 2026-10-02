@@ -10,7 +10,7 @@ type Data = {
   sessions: { id: string; startedAt: string; completedAt: string | null }[];
   activeSession: { id: string; startedAt: string; pausedAt: string | null; elapsedSeconds: number; schedule: Schedule | null } | null;
   nextSchedule: Schedule | null;
-  summary: { completedCount: number; currentWeight: number | null };
+  summary?: { completedCount: number; currentWeight: number | null };
 };
 
 export default function DashboardPage() {
@@ -28,7 +28,7 @@ export default function DashboardPage() {
   const workoutTarget = next?.template;
   const workoutHref = workoutTarget ? `/workout?day=${workoutTarget.dayNumber}&date=${next?.scheduledDate.slice(0, 10)}` : "/calendar";
   const completed = data?.summary.completedCount ?? 0;
-  const currentWeight = data?.summary.currentWeight;
+  const currentWeight = data?.summary?.currentWeight;
   const planDays = data?.plan?.templates.length ?? 0;
   const todayLabel = next ? new Date(next.scheduledDate).toLocaleDateString("it-IT", { weekday: "long", day: "numeric", month: "long" }) : null;
 

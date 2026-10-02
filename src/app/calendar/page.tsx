@@ -231,3 +231,5 @@ export default function CalendarPage() {
       </section>
     </div>
 
+  </main>;
+}

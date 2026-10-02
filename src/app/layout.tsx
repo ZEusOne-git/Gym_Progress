@@ -4,13 +4,13 @@ import UserAppShell from "@/components/UserAppShell";
 
 export const metadata: Metadata = {
   title: "Gym Progress",
-  description: "Personalized training and progress tracking",
+  description: "Allenamento personalizzato e monitoraggio dei progressi",
   manifest: "/manifest.webmanifest",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en">
+    <html lang="it">
       <body><UserAppShell>{children}</UserAppShell></body>
     </html>
   );

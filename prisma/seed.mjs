@@ -1,4 +1,4 @@
-import { createHash, randomBytes, scryptSync } from "node:crypto";
+import { randomBytes, scryptSync } from "node:crypto";
 import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
@@ -47,33 +47,37 @@ const adminEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase();
 const adminPassword = process.env.ADMIN_PASSWORD;
 
 if (adminEmail && adminPassword) {
-  if (adminPassword.length < 8) {
-    throw new Error("ADMIN_PASSWORD must be at least 8 characters.");
-  }
-
+  if (adminPassword.length < 8) throw new Error("ADMIN_PASSWORD must be at least 8 characters.");
   const existing = await prisma.user.findUnique({ where: { email: adminEmail } });
   const passwordHash = hashPassword(adminPassword);
-
   if (existing) {
-    await prisma.user.update({
-      where: { id: existing.id },
-      data: { role: "ADMIN", passwordHash },
-    });
+    await prisma.user.update({ where: { id: existing.id }, data: { role: "ADMIN", passwordHash } });
     console.log(`Promoted ${adminEmail} to ADMIN and reset its development password.`);
   } else {
-    await prisma.user.create({
-      data: {
-        email: adminEmail,
-        passwordHash,
-        role: "ADMIN",
-        profile: { create: { firstName: "Admin" } },
-        notificationPrefs: { create: {} },
-      },
-    });
+    await prisma.user.create({ data: { email: adminEmail, passwordHash, role: "ADMIN", profile: { create: { firstName: "Admin" } }, notificationPrefs: { create: {} } } });
     console.log(`Created development ADMIN account: ${adminEmail}`);
   }
 } else {
   console.log("ADMIN_EMAIL/ADMIN_PASSWORD not set; skipped admin bootstrap.");
+}
+
+const demoEmail = "atleta@test.it";
+const demoPassword = "atleta123456";
+const existingDemo = await prisma.user.findUnique({ where: { email: demoEmail } });
+if (existingDemo) {
+  await prisma.user.update({ where: { id: existingDemo.id }, data: { role: "USER", passwordHash: hashPassword(demoPassword) } });
+  console.log(`Ready development USER account: ${demoEmail}`);
+} else {
+  await prisma.user.create({
+    data: {
+      email: demoEmail,
+      passwordHash: hashPassword(demoPassword),
+      role: "USER",
+      profile: { create: { firstName: "Alessandro", trainingDays: 3, sessionMinutes: 60, experience: "BEGINNER" } },
+      notificationPrefs: { create: {} },
+    },
+  });
+  console.log(`Created development USER account: ${demoEmail}`);
 }
 
 console.log(`Seeded ${exercises.length} exercises.`);

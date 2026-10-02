@@ -2,14 +2,13 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowRight, BarChart3, CalendarDays, Check, ChevronLeft, ChevronRight, Clock3, Dumbbell, UserRound } from "lucide-react";
+import { ArrowRight, Check, ChevronLeft, ChevronRight, Clock3, Dumbbell } from "lucide-react";
 
 type Exercise = { id: string; sets: number; repMin: number; repMax: number; exercise: { name: string } };
 type Template = { id: string; dayNumber: number; name: string; estimatedMins: number | null; exercises: Exercise[] };
 type Schedule = { id: string; scheduledDate: string; templateId: string; template: Template; session: { id: string; startedAt: string; completedAt: string | null } | null };
 type Data = { plan: { id: string; name: string; templates: Template[] } | null; schedules: Schedule[]; sessions: { id: string; startedAt: string; completedAt: string | null }[]; nextSchedule: { id: string; scheduledDate: string; template: Template } | null };
 
-const navItems = [["Dashboard", "/dashboard", BarChart3], ["Progress", "/progress", BarChart3], ["Calendario", "/calendar", CalendarDays], ["Profilo", "/profile", UserRound]] as const;
 const keyOf = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 const addDays = (d: Date, n: number) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
 const sameDay = (a: Date, b: Date) => keyOf(a) === keyOf(b);
@@ -232,6 +231,3 @@ export default function CalendarPage() {
       </section>
     </div>
 
-    <nav className="fixed inset-x-0 bottom-0 z-40 px-3 pb-[max(10px,env(safe-area-inset-bottom))] pt-2 sm:hidden"><div className="mx-auto grid max-w-md grid-cols-4 gap-1 rounded-[24px] border border-[var(--border)] bg-[var(--surface)]/90 p-1.5 shadow-[0_16px_50px_rgba(0,0,0,.35)] backdrop-blur-2xl">{navItems.map(([label, href, Icon]) => { const active = label === "Calendario"; return <Link key={label} href={href} className={`flex flex-col items-center gap-1 rounded-[18px] py-2 text-[10px] font-black transition active:scale-95 ${active ? "bg-[var(--accent)] text-[var(--accent-foreground)]" : "text-[var(--muted)]"}`}><Icon size={22} strokeWidth={active ? 2.6 : 2}/><span>{label}</span></Link>; })}</div></nav>
-  </main>;
-}

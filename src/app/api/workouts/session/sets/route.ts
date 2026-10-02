@@ -17,13 +17,30 @@ export async function POST(request: Request) {
     if (!sessionId || !exerciseId || !Number.isInteger(setNumber) || setNumber < 1 || !Number.isFinite(weight) || weight < 0 || !Number.isInteger(reps) || reps < 0) {
       return NextResponse.json({ error: "Inserisci peso e ripetizioni validi." }, { status: 400 });
     }
-    const session = await prisma.workoutSession.findFirst({ where: { id: sessionId, userId: user.id, completedAt: null }, select: { id: true, workoutPlanId: true } });
+
+    const session = await prisma.workoutSession.findFirst({
+      where: { id: sessionId, userId: user.id, completedAt: null },
+      select: { id: true, workoutPlanId: true },
+    });
     if (!session) return NextResponse.json({ error: "Sessione non disponibile." }, { status: 404 });
-    const exercise = await prisma.workoutExercise.findFirst({ where: { exerciseId, template: { workoutPlanId: session.workoutPlanId } }, select: { id: true } });
+
+    // The workout UI works with WorkoutExercise ids, while WorkoutSet.exerciseId
+    // stores the underlying Exercise id. Accept both and normalize here.
+    const exercise = await prisma.workoutExercise.findFirst({
+      where: {
+        template: { workoutPlanId: session.workoutPlanId },
+        OR: [{ id: exerciseId }, { exerciseId }],
+      },
+      select: { exerciseId: true },
+    });
     if (!exercise) return NextResponse.json({ error: "Esercizio non presente nella sessione." }, { status: 400 });
-    const existing = await prisma.workoutSet.findFirst({ where: { sessionId, exerciseId, setNumber } });
+
+    const normalizedExerciseId = exercise.exerciseId;
+    const existing = await prisma.workoutSet.findFirst({ where: { sessionId, exerciseId: normalizedExerciseId, setNumber } });
     const data = { weight, reps, rir, completed };
-    const set = existing ? await prisma.workoutSet.update({ where: { id: existing.id }, data }) : await prisma.workoutSet.create({ data: { sessionId, exerciseId, setNumber, ...data } });
+    const set = existing
+      ? await prisma.workoutSet.update({ where: { id: existing.id }, data })
+      : await prisma.workoutSet.create({ data: { sessionId, exerciseId: normalizedExerciseId, setNumber, ...data } });
     return NextResponse.json({ set });
   } catch (error) {
     console.error("[workouts/session/sets POST]", error);

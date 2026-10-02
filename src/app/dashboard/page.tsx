@@ -19,7 +19,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => { fetch("/api/auth/me").then(r => r.json()).then(d => { if (!d.user) { window.location.href = "/login?next=/dashboard"; return; } const role = d.user.role || "USER"; if (role === "USER" && !d.user.onboarding?.completedAt) { window.location.href = "/onboarding"; return; } setUser({ firstName: d.user.profile?.firstName?.trim() || "Athlete", role }); }); }, []);
-  useEffect(() => { const now = new Date(); fetch(`/api/workouts/dashboard?year=${now.getFullYear()}&month=${now.getMonth()}`).then(r => r.json()).then(setData).finally(() => setLoading(false)); }, []);
+  useEffect(() => { const now = new Date(); fetch(`/api/workouts/dashboard?year=${now.getFullYear()}&month=${now.getMonth()}`).then(async r => { const body = await r.text(); if (!r.ok) throw new Error(body || `HTTP ${r.status}`); return body ? JSON.parse(body) : null; }).then(d => { if (d) setData(d); }).catch(error => console.error("[DashboardPage]", error)).finally(() => setLoading(false)); }, []);
 
   if (!user) return <main className="min-h-screen p-8 text-sm text-[var(--muted)]">Caricamento...</main>;
 

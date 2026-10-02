@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { clearLoginThrottle, createSession, getLoginThrottle, recordFailedLogin, verifyPassword } from "@/lib/auth";
+import { clearLoginThrottle, createSession, getLoginThrottle, recordFailedLogin, verifyLoginPassword } from "@/lib/auth";
 
 const loginInput = z.object({
   email: z.string().trim().email().max(254).transform(value => value.toLowerCase()),
@@ -34,7 +34,7 @@ export async function POST(request: Request) {
     }
 
     const user = await prisma.user.findUnique({ where: { email } });
-    if (!user || !verifyPassword(password, user.passwordHash)) {
+    if (!verifyLoginPassword(password, user?.passwordHash ?? null) || !user) {
       const blockedFor = await recordFailedLogin(email);
       if (blockedFor) {
         return NextResponse.json(

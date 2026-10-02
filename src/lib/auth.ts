@@ -7,6 +7,8 @@ const SESSION_COOKIE = "gym_progress_session";
 const SESSION_DAYS = 30;
 const LOGIN_ATTEMPT_LIMIT = 5;
 const LOGIN_WINDOW_MS = 15 * 60 * 1000;
+const LOGIN_THROTTLE_RETENTION_MS = 24 * 60 * 60 * 1000;
+const DUMMY_PASSWORD_HASH = hashPassword(randomBytes(32).toString("hex"));
 
 export function hashPassword(password: string) {
   const salt = randomBytes(16).toString("hex");
@@ -44,6 +46,10 @@ export async function recordFailedLogin(email: string) {
   const windowStart = new Date(now.getTime() - LOGIN_WINDOW_MS);
   const key = loginThrottleKey(email);
 
+  await prisma.loginThrottle.deleteMany({
+    where: { updatedAt: { lt: new Date(now.getTime() - LOGIN_THROTTLE_RETENTION_MS) } },
+  });
+
   await prisma.$executeRaw(Prisma.sql`
     INSERT INTO "LoginThrottle" ("key", "attempts", "windowStartedAt", "blockedUntil", "updatedAt")
     VALUES (${key}, 1, ${now}, NULL, ${now})
@@ -60,6 +66,10 @@ export async function recordFailedLogin(email: string) {
   const blockedUntil = new Date(now.getTime() + LOGIN_WINDOW_MS);
   await prisma.loginThrottle.update({ where: { key }, data: { blockedUntil } });
   return Math.ceil(LOGIN_WINDOW_MS / 1000);
+}
+
+export function verifyLoginPassword(password: string, storedHash: string | null) {
+  return verifyPassword(password, storedHash ?? DUMMY_PASSWORD_HASH);
 }
 
 export async function clearLoginThrottle(email: string) {

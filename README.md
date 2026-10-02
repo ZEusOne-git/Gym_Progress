@@ -57,7 +57,7 @@ npm run dev
 
 Set `NODE_ENV=production` in production. Demo accounts and demo workout plans are skipped in this mode. Set `ADMIN_EMAIL` and `ADMIN_PASSWORD` only for the initial admin bootstrap; existing production admin credentials are never reset by the seed.
 
-Login attempts are counted by a one-way email key in the database; five failed attempts within 15 minutes trigger a 15-minute cooldown. Before opening registration to real users, also configure edge rate limits for `/api/auth/login` and `/api/auth/register`, publish the app behind HTTPS, and provide the privacy and data-retention information required for the service owner and jurisdiction.
+Login attempts are counted by a hashed email key in the database; five failed attempts within 15 minutes trigger a 15-minute cooldown, and inactive throttle records are pruned after 24 hours. Before opening registration to real users, also configure edge rate limits for `/api/auth/login` and `/api/auth/register`, publish the app behind HTTPS, and provide the privacy and data-retention information required for the service owner and jurisdiction.
 
 Exercise data by [RepDB](https://repdb.co).
 

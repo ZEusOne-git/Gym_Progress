@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Check, ChevronRight, Clock3, Dumbbell, Loader2, Play, SkipForward, TimerReset, TrendingUp } from "lucide-react";
+import { ArrowLeft, Check, ChevronRight, Clock3, Loader2, Play, SkipForward, TrendingUp } from "lucide-react";
 
 type Media = { url: string; type: string; thumbnailUrl: string | null };
 type Exercise = { id: string; sets: number; repMin: number; repMax: number; restSeconds: number; rirTarget?: number | null; targetWeight?: number | null; exercise: { name: string; category: string; media?: Media[] } };
@@ -137,16 +137,6 @@ export default function ActiveWorkoutPage() {
     finally { setSaving(false); }
   }
 
-  function continueToNextExercise() {
-    if (!data || !currentExerciseCompleted || !isLastExercise) {
-      if (!data || !currentExerciseCompleted) return;
-      setCurrentExerciseIndex(index => index + 1);
-      setCurrentSetIndex(0);
-      setPhase("idle");
-      setPhaseSeconds(0);
-    }
-  }
-
   async function finishWorkout() {
     if (!sessionId || !allCompleted) { setError("Completa tutte le serie prima di chiudere l'allenamento."); return; }
     setSaving(true); setError("");
@@ -164,7 +154,7 @@ export default function ActiveWorkoutPage() {
 
   return <main className="min-h-screen bg-[var(--background)] pb-36"><div className="mx-auto max-w-4xl px-5 py-6 sm:px-8">
     <Link href="/calendar" className="inline-flex items-center gap-2 text-sm font-bold text-[var(--muted)]"><ArrowLeft size={17}/> Esci dal workout</Link>
-    <header className="mt-7 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-xs font-black tracking-[0.2em] text-[var(--accent)]">GIORNO {data.template.dayNumber} · {data.plan.name.toUpperCase()}</p><h1 className="mt-2 text-4xl font-black tracking-tight">{data.template.name}</h1><p className="mt-2 text-sm text-[var(--muted)]">Esercizio {currentExerciseIndex + 1} di {data.template.exercises.length}</p></div><div className="flex flex-wrap gap-2">{data.template.exercises.map((exercise, index) => <span key={exercise.id} className={`rounded-full px-3 py-1.5 text-xs font-black ${index === currentExerciseIndex ? "bg-[var(--accent)] text-[var(--accent-foreground)]" : "bg-[var(--surface)] text-[var(--muted)]"}`}>{index + 1}. {exercise.name}</span>)}</div></header>
+    <header className="mt-7 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-xs font-black tracking-[0.2em] text-[var(--accent)]">GIORNO {data.template.dayNumber} · {data.plan.name.toUpperCase()}</p><h1 className="mt-2 text-4xl font-black tracking-tight">{data.template.name}</h1><p className="mt-2 text-sm text-[var(--muted)]">Esercizio {currentExerciseIndex + 1} di {data.template.exercises.length}</p></div><div className="flex flex-wrap gap-2">{data.template.exercises.map((exercise, index) => <span key={exercise.id} className={`rounded-full px-3 py-1.5 text-xs font-black ${index === currentExerciseIndex ? "bg-[var(--accent)] text-[var(--accent-foreground)]" : "bg-[var(--surface)] text-[var(--muted)]"}`}>{index + 1}. {exercise.exercise.name}</span>)}</div></header>
 
     {!sessionId ? <section className="mt-6 rounded-[2rem] bg-[var(--accent)] p-6 text-[var(--accent-foreground)] shadow-2xl sm:p-8"><p className="text-xs font-black uppercase tracking-[0.18em] opacity-70">SESSIONE PRONTA</p><h2 className="mt-2 text-3xl font-black">Tutta la scheda è pronta.</h2><p className="mt-2 max-w-xl text-sm opacity-80">I carichi consigliati sono già impostati. Premi una volta e poi lavorerai serie per serie, passando automaticamente all'esercizio successivo.</p><button type="button" onClick={startWorkout} disabled={saving} className="mt-6 inline-flex items-center justify-center gap-2 rounded-2xl bg-[var(--accent-foreground)] px-7 py-4 text-sm font-black !text-white disabled:opacity-60"><Play size={17} fill="currentColor"/> {saving ? "AVVIO..." : "INIZIA ALLENAMENTO"}</button></section> : <>
       <section className="mt-6 overflow-hidden rounded-[2rem] border border-[var(--border)] bg-[var(--surface)] shadow-2xl"><div className="aspect-video bg-black">{media?.url && media.type !== "IMAGE" ? <video key={media.url} controls playsInline poster={media.thumbnailUrl ?? undefined} className="h-full w-full object-cover" src={media.url} /> : media?.url ? <img src={media.url} alt={currentExercise.exercise.name} className="h-full w-full object-cover"/> : <div className="grid h-full place-items-center p-8 text-center"><div><div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-white/10 text-white"><Play size={28}/></div><p className="mt-4 font-black text-white">Video dimostrativo</p><p className="mt-1 text-sm text-white/60">Aggiungi un video alla Exercise Library per mostrarlo qui.</p></div></div>}</div><div className="p-5 sm:p-7"><div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"><div><p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--accent)]">ESERCIZIO {currentExerciseIndex + 1}</p><h2 className="mt-1 text-3xl font-black">{currentExercise.exercise.name}</h2><p className="mt-1 text-sm text-[var(--muted)]">{currentExercise.repMin}–{currentExercise.repMax} reps · {currentExercise.restSeconds}s recupero</p></div><span className="rounded-full bg-[var(--surface-strong)] px-3 py-1.5 text-xs font-black text-[var(--muted)]">{currentExercise.sets} serie</span></div>

@@ -65,7 +65,7 @@ export default function ActiveWorkoutPage() {
         if (!response.ok) throw new Error(json.error || "Impossibile caricare il workout.");
         return json as Data;
       }),
-      fetch(`/api/workouts/session?template=${templateId}`).then(async response => {
+      fetch(`/api/workouts/session?template=${templateId}${scheduledDate ? `&date=${encodeURIComponent(scheduledDate)}` : ""}`).then(async response => {
         const json = await response.json();
         if (!response.ok) throw new Error(json.error || "Impossibile recuperare la sessione.");
         return json;
@@ -93,7 +93,7 @@ export default function ActiveWorkoutPage() {
       }
       setPhase("ready");
     }).catch(errorValue => setError(errorValue instanceof Error ? errorValue.message : "Errore")).finally(() => setLoading(false));
-  }, [templateId]);
+  }, [templateId, scheduledDate]);
 
   useEffect(() => {
     if (!sessionId) return;

@@ -52,17 +52,29 @@ export async function PATCH(request: Request) {
 
     const session = await prisma.workoutSession.findFirst({
       where: { id: sessionId, userId: user.id, completedAt: null },
-      include: { sets: true, plan: { select: { templates: { include: { exercises: { select: { exerciseId: true, sets: true } } } } } } },
+      include: {
+        sets: true,
+        schedule: { include: { template: { include: { exercises: { select: { exerciseId: true, sets: true } } } } } },
+        plan: { select: { templates: { include: { exercises: { select: { exerciseId: true, sets: true } } } } } },
+      },
     });
     if (!session) return NextResponse.json({ error: "Sessione non trovata." }, { status: 404 });
 
-    const exerciseRequirements = new Map<string, number>();
-    for (const template of session.plan.templates) {
-      for (const item of template.exercises) exerciseRequirements.set(item.exerciseId, Math.max(exerciseRequirements.get(item.exerciseId) ?? 0, item.sets));
-    }
-    for (const [exerciseId, requiredSets] of exerciseRequirements) {
-      const completedSets = session.sets.filter(set => set.exerciseId === exerciseId && set.completed);
-      if (completedSets.length < requiredSets) return NextResponse.json({ error: "Completa tutte le serie previste prima di chiudere l'allenamento." }, { status: 400 });
+    const currentTemplate = session.schedule?.template ?? (() => {
+      const sessionExerciseIds = new Set(session.sets.map(set => set.exerciseId));
+      return session.plan.templates.find(template => {
+        const templateExerciseIds = new Set(template.exercises.map(item => item.exerciseId));
+        return templateExerciseIds.size === sessionExerciseIds.size && [...templateExerciseIds].every(id => sessionExerciseIds.has(id));
+      }) ?? null;
+    })();
+
+    if (currentTemplate) {
+      for (const item of currentTemplate.exercises) {
+        const completedSets = session.sets.filter(set => set.exerciseId === item.exerciseId && set.completed);
+        if (completedSets.length < item.sets) return NextResponse.json({ error: "Completa tutte le serie previste prima di chiudere l'allenamento." }, { status: 400 });
+      }
+    } else if (!session.sets.length || session.sets.some(set => !set.completed)) {
+      return NextResponse.json({ error: "Completa tutte le serie prima di chiudere l'allenamento." }, { status: 400 });
     }
 
     const updated = await prisma.workoutSession.update({ where: { id: sessionId }, data: { completedAt: new Date() }, select: { id: true, completedAt: true } });

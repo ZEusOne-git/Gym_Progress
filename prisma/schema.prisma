@@ -212,6 +212,7 @@ model WorkoutSession {
   pausedAt DateTime?
   elapsedSeconds Int @default(0)
   completedAt DateTime?
+  endedEarly Boolean @default(false)
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   plan WorkoutPlan @relation(fields: [workoutPlanId], references: [id])
   schedule WorkoutSchedule? @relation(fields: [scheduleId], references: [id])

@@ -10,6 +10,7 @@ type Data = {
   sessions: { id: string; startedAt: string; completedAt: string | null }[];
   activeSession: { id: string; startedAt: string; pausedAt: string | null; elapsedSeconds: number; schedule: Schedule | null } | null;
   nextSchedule: Schedule | null;
+  summary: { completedCount: number; currentWeight: number | null };
 };
 
 export default function DashboardPage() {
@@ -26,8 +27,9 @@ export default function DashboardPage() {
   const active = data?.activeSession;
   const workoutTarget = next?.template;
   const workoutHref = workoutTarget ? `/workout?day=${workoutTarget.dayNumber}&date=${next?.scheduledDate.slice(0, 10)}` : "/calendar";
-  const completed = data?.sessions.filter(s => s.completedAt).length ?? 0;
-  const scheduledThisMonth = data?.plan?.templates.length ?? 0;
+  const completed = data?.summary.completedCount ?? 0;
+  const currentWeight = data?.summary.currentWeight;
+  const planDays = data?.plan?.templates.length ?? 0;
   const todayLabel = next ? new Date(next.scheduledDate).toLocaleDateString("it-IT", { weekday: "long", day: "numeric", month: "long" }) : null;
 
   return <main className="min-h-screen overflow-x-hidden bg-[var(--background)] pb-28">
@@ -42,13 +44,13 @@ export default function DashboardPage() {
           <p className="text-xl font-black tracking-[-0.04em]">{completed}</p>
           <p className="mt-1 text-[9px] font-black uppercase tracking-[0.16em] text-[var(--muted)]">workout</p>
         </Link>
-        <Link href="/calendar" className="border-r border-[var(--border)] px-3 text-center transition active:opacity-70">
-          <p className="text-xl font-black tracking-[-0.04em]">{scheduledThisMonth || "—"}</p>
-          <p className="mt-1 text-[9px] font-black uppercase tracking-[0.16em] text-[var(--muted)]">giorni piano</p>
+        <Link href="/progress" className="border-r border-[var(--border)] px-3 text-center transition active:opacity-70">
+          <p className="text-xl font-black tracking-[-0.04em]">{currentWeight != null ? `${currentWeight} kg` : "—"}</p>
+          <p className="mt-1 text-[9px] font-black uppercase tracking-[0.16em] text-[var(--muted)]">peso attuale</p>
         </Link>
         <Link href="/programs" className="pl-3 text-right transition active:opacity-70">
           <p className="truncate text-sm font-black">{data?.plan?.name || (loading ? "Caricamento..." : "Nessun programma")}</p>
-          <p className="mt-1 text-[9px] font-black uppercase tracking-[0.16em] text-[var(--muted)]">programma</p>
+          <p className="mt-1 text-[9px] font-black uppercase tracking-[0.16em] text-[var(--muted)]">{planDays ? `${planDays} giorni/settimana` : "programma"}</p>
         </Link>
       </section>
 

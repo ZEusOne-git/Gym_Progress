@@ -66,37 +66,40 @@ export default function CalendarPage() {
   const visibleDays = useMemo(() => Array.from({ length: 5 }, (_, index) => addDays(selected, index - 2)), [selectedKey]);
 
   function move(days: number) { setSelected(current => addDays(current, days)); }
-  function goToday() { const now = new Date(); setSelected(now); }
+  function goToday() { setSelected(new Date()); }
 
   function startPointer(clientX: number) { pointerStart.current = clientX; setDragging(true); setDragX(0); }
   function movePointer(clientX: number) {
     if (pointerStart.current === null) return;
     const delta = clientX - pointerStart.current;
-    setDragX(Math.max(-90, Math.min(90, delta)));
+    setDragX(Math.max(-140, Math.min(140, delta)));
   }
   function endPointer() {
     if (pointerStart.current === null) return;
     const delta = dragX;
-    pointerStart.current = null; setDragging(false); setDragX(0);
-    if (Math.abs(delta) > 28) move(delta < 0 ? 1 : -1);
+    pointerStart.current = null; setDragging(false);
+    if (Math.abs(delta) > 32) {
+      const direction = delta < 0 ? 1 : -1;
+      setDragX(direction * -58);
+      window.setTimeout(() => { setSelected(current => addDays(current, direction)); setDragX(0); }, 110);
+    } else setDragX(0);
   }
 
   return <main className="min-h-screen bg-[var(--background)] pb-28">
     <div className="mx-auto max-w-5xl px-5 py-7 sm:px-8 sm:py-10">
-      <header className="flex items-center justify-between gap-4">
+      <header className="flex items-center gap-4">
         <div className="min-w-0"><p className="text-[10px] font-black tracking-[0.3em] text-[var(--accent)]">TRAINING CALENDAR</p><h1 className="mt-2 text-4xl font-black tracking-[-0.055em] sm:text-5xl">Calendario</h1></div>
-        <button type="button" onClick={goToday} className="shrink-0 rounded-full border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-xs font-black text-[var(--foreground)] transition duration-200 hover:-translate-y-0.5 hover:border-[var(--accent)]">Torna a oggi</button>
       </header>
 
       {notice && <div className="mt-6 flex items-center gap-3 border-y border-[var(--accent)]/20 py-3"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--accent)] text-[var(--accent-foreground)]"><Check size={15} strokeWidth={3}/></span><div><p className="text-sm font-black">Allenamento completato</p><p className="text-xs text-[var(--muted)]">La sessione è stata registrata.</p></div><button type="button" onClick={() => setNotice(false)} className="ml-auto text-lg text-[var(--muted)]" aria-label="Chiudi">×</button></div>}
 
       <section className="mt-10">
-        <div className="flex items-center justify-between gap-4"><div className="min-w-0"><p className="text-[10px] font-black uppercase tracking-[0.24em] text-[var(--muted)]">{selected.toLocaleDateString("it-IT", { month: "long", year: "numeric" })}</p><p className="mt-1 truncate text-sm font-bold">{data?.plan?.name || "Il tuo programma"}</p></div><div className="flex items-center gap-1"><button type="button" onClick={() => move(-7)} className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--muted)] transition hover:bg-[var(--surface)] hover:text-[var(--foreground)]" aria-label="Settimana precedente"><ChevronLeft size={18}/></button><button type="button" onClick={goToday} className="rounded-full px-3 py-2 text-[10px] font-black text-[var(--muted)] transition hover:bg-[var(--surface)] hover:text-[var(--foreground)]">OGGI</button><button type="button" onClick={() => move(7)} className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--muted)] transition hover:bg-[var(--surface)] hover:text-[var(--foreground)]" aria-label="Settimana successiva"><ChevronRight size={18}/></button></div></div>
+        <div className="flex items-center justify-between gap-4"><div className="min-w-0"><p className="text-[10px] font-black uppercase tracking-[0.24em] text-[var(--muted)]">{selected.toLocaleDateString("it-IT", { month: "long", year: "numeric" })}</p><p className="mt-1 truncate text-sm font-bold">{data?.plan?.name || "Il tuo programma"}</p></div><div className="flex items-center gap-1"><button type="button" onClick={() => move(-7)} className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--muted)] transition hover:bg-[var(--surface)] hover:text-[var(--foreground)]" aria-label="Settimana precedente"><ChevronLeft size={18}/></button><button type="button" onClick={goToday} disabled={isToday} className={`rounded-full px-3 py-2 text-[10px] font-black transition ${isToday ? "cursor-default text-[var(--foreground)]" : "text-[var(--muted)] hover:bg-[var(--surface)] hover:text-[var(--foreground)]"}`}>OGGI</button><button type="button" onClick={() => move(7)} className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--muted)] transition hover:bg-[var(--surface)] hover:text-[var(--foreground)]" aria-label="Settimana successiva"><ChevronRight size={18}/></button></div></div>
 
         <div className="mt-8 overflow-hidden border-y border-[var(--border)] py-5 select-none touch-pan-y" onPointerDown={e => { if (e.pointerType !== "mouse" || e.buttons === 1) { e.currentTarget.setPointerCapture(e.pointerId); startPointer(e.clientX); } }} onPointerMove={e => movePointer(e.clientX)} onPointerUp={endPointer} onPointerCancel={endPointer}>
-          <div className={`grid grid-cols-5 items-end transition-transform duration-300 ease-out ${dragging ? "duration-0" : ""}`} style={{ transform: `translateX(${dragX * 0.18}px)` }}>
-            {visibleDays.map((day, index) => { const schedule = schedules.get(keyOf(day)); const active = index === 2; const done = Boolean(schedule?.session?.completedAt); const todayDay = sameDay(day, today); return <button key={keyOf(day)} type="button" onClick={() => !dragging && setSelected(day)} className="group flex min-w-0 flex-col items-center focus:outline-none"><span className={`text-[9px] font-black uppercase tracking-[0.13em] transition-colors sm:text-[10px] ${active ? "text-[var(--foreground)]" : "text-[var(--muted)]"}`}>{day.toLocaleDateString("it-IT", { weekday: "short" }).replace(".", "")}</span><span className={`mt-2 flex h-12 w-12 items-center justify-center rounded-full text-xl font-black leading-none transition-all duration-300 sm:h-14 sm:w-14 sm:text-2xl ${active ? "bg-[var(--accent)] text-[var(--accent-foreground)] shadow-[0_8px_25px_rgba(190,255,38,.18)] scale-105" : "text-[var(--foreground)] group-hover:bg-[var(--surface)]"}`}>{day.getDate()}</span><span className={`mt-3 h-1.5 w-1.5 rounded-full ${done ? "bg-[var(--accent)]" : schedule ? "bg-[var(--accent)]/60" : "bg-[var(--border)]"}`} />{todayDay && <span className={`mt-2 text-[8px] font-black uppercase tracking-[0.14em] ${active ? "text-[var(--accent)]" : "text-[var(--muted)]"}`}>oggi</span>}</button>; })}
-          </div><p className="mt-5 text-center text-[9px] font-bold uppercase tracking-[0.18em] text-[var(--muted)]">Scorri per cambiare giorno</p>
+          <div className="grid h-[118px] grid-cols-5 items-center will-change-transform" style={{ transform: `translate3d(${dragX * 0.42}px,0,0)`, transition: dragging ? "none" : "transform 360ms cubic-bezier(.22,1,.36,1)" }}>
+            {visibleDays.map((day, index) => { const schedule = schedules.get(keyOf(day)); const active = index === 2; const done = Boolean(schedule?.session?.completedAt); const todayDay = sameDay(day, today); return <button key={keyOf(day)} type="button" onClick={() => !dragging && setSelected(day)} className="group flex h-[118px] min-w-0 flex-col items-center justify-center focus:outline-none"><span className={`text-[9px] font-black uppercase tracking-[0.13em] sm:text-[10px] ${active ? "text-[var(--foreground)]" : "text-[var(--muted)]"}`}>{day.toLocaleDateString("it-IT", { weekday: "short" }).replace(".", "")}</span><span className={`mt-2 flex h-14 w-14 shrink-0 items-center justify-center rounded-full text-xl font-black leading-none transition-colors duration-300 sm:text-2xl ${active ? "bg-[var(--accent)] text-[var(--accent-foreground)] shadow-[0_8px_25px_rgba(190,255,38,.18)]" : "text-[var(--foreground)] group-hover:bg-[var(--surface)]"}`}>{day.getDate()}</span><span className={`mt-3 h-1.5 w-1.5 shrink-0 rounded-full ${done ? "bg-[var(--accent)]" : schedule ? "bg-[var(--accent)]/60" : "bg-[var(--border)]"}`} />{todayDay && <span className={`mt-2 h-3 text-[8px] font-black uppercase tracking-[0.14em] ${active ? "text-[var(--accent)]" : "text-[var(--muted)]"}`}>oggi</span>}</button>; })}
+          </div><p className="mt-2 text-center text-[9px] font-bold uppercase tracking-[0.18em] text-[var(--muted)]">Scorri per cambiare giorno</p>
         </div>
       </section>
 
@@ -105,6 +108,6 @@ export default function CalendarPage() {
         {error && <p className="mt-4 text-sm font-bold text-red-400">{error}</p>}
       </section>
     </div>
-    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--border)] bg-[var(--surface)]/95 px-3 pb-[max(10px,env(safe-area-inset-bottom))] pt-2 backdrop-blur-xl sm:hidden"><div className="mx-auto grid max-w-md grid-cols-4 gap-1">{navItems.map(([label, href, Icon]) => { const active = label === "Calendario"; return <Link key={label} href={href} className={`flex flex-col items-center gap-1 rounded-2xl py-2 text-[10px] font-black transition ${active ? "bg-[var(--accent)] text-[var(--accent-foreground)]" : "text-[var(--muted)]"}`}><Icon size={20}/><span>{label}</span></Link>; })}</div></nav>
+    <nav className="fixed inset-x-0 bottom-0 z-40 px-3 pb-[max(10px,env(safe-area-inset-bottom))] pt-2 sm:hidden"><div className="mx-auto grid max-w-md grid-cols-4 gap-1 rounded-[24px] border border-[var(--border)] bg-[var(--surface)]/90 p-1.5 shadow-[0_16px_50px_rgba(0,0,0,.35)] backdrop-blur-2xl">{navItems.map(([label, href, Icon]) => { const active = label === "Calendario"; return <Link key={label} href={href} className={`flex flex-col items-center gap-1 rounded-[18px] py-2 text-[10px] font-black transition ${active ? "bg-[var(--accent)] text-[var(--accent-foreground)]" : "text-[var(--muted)] hover:bg-[var(--background)]/60"}`}><Icon size={20}/><span>{label}</span></Link>; })}</div></nav>
   </main>;
 }

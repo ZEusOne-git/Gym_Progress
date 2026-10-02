@@ -7,11 +7,46 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum UserRole { USER ADMIN SUPER_ADMIN }
-enum GoalType { FAT_LOSS MUSCLE_GAIN RECOMPOSITION STRENGTH GENERAL_FITNESS }
-enum Difficulty { BEGINNER INTERMEDIATE ADVANCED }
-enum MediaType { VIDEO WEBM GIF IMAGE }
-enum Muscle { CHEST BACK SHOULDERS BICEPS TRICEPS ABS GLUTES QUADS HAMSTRINGS CALVES LOWER_BACK }
+enum UserRole {
+  USER
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum GoalType {
+  FAT_LOSS
+  MUSCLE_GAIN
+  RECOMPOSITION
+  STRENGTH
+  GENERAL_FITNESS
+}
+
+enum Difficulty {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+}
+
+enum MediaType {
+  VIDEO
+  WEBM
+  GIF
+  IMAGE
+}
+
+enum Muscle {
+  CHEST
+  BACK
+  SHOULDERS
+  BICEPS
+  TRICEPS
+  ABS
+  GLUTES
+  QUADS
+  HAMSTRINGS
+  CALVES
+  LOWER_BACK
+}
 
 model User {
   id                String                 @id @default(cuid())

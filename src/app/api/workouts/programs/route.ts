@@ -1,0 +1,99 @@
+import { NextResponse } from "next/server";
+import { getCurrentUser } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
+
+function weekdaysFor(count: number) {
+  const presets: Record<number, number[]> = {
+    1: [1],
+    2: [1, 5],
+    3: [1, 3, 5],
+    4: [1, 3, 5, 7],
+    5: [1, 2, 4, 5, 7],
+    6: [1, 2, 3, 4, 5, 7],
+    7: [1, 2, 3, 4, 5, 6, 7],
+  };
+  return (presets[Math.max(1, Math.min(count, 7))] ?? presets[4]).slice(0, count);
+}
+
+function nextMonday() {
+  const date = new Date();
+  date.setHours(0, 0, 0, 0);
+  const monday = new Date(date);
+  const daysUntilMonday = ((8 - (date.getDay() || 7)) % 7) || 7;
+  monday.setDate(date.getDate() + daysUntilMonday);
+  monday.setHours(12, 0, 0, 0);
+  return { today: date, monday };
+}
+
+export async function GET() {
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: "Non autorizzato" }, { status: 401 });
+  const plans = await prisma.workoutPlan.findMany({
+    where: { isTemplate: true, isActive: true },
+    orderBy: { updatedAt: "desc" },
+    select: {
+      id: true,
+      name: true,
+      templates: {
+        orderBy: { dayNumber: "asc" },
+        select: { id: true, dayNumber: true, name: true, estimatedMins: true, _count: { select: { exercises: true } } },
+      },
+    },
+  });
+  const current = await prisma.workoutPlan.findFirst({ where: { userId: user.id, isActive: true, isTemplate: false }, select: { id: true, name: true } });
+  return NextResponse.json({ plans, current });
+}
+
+export async function POST(request: Request) {
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: "Non autorizzato" }, { status: 401 });
+  const body = await request.json().catch(() => ({}));
+  const templatePlanId = typeof body.templatePlanId === "string" ? body.templatePlanId : "";
+  if (!templatePlanId) return NextResponse.json({ error: "Seleziona un programma." }, { status: 400 });
+
+  const [profile, source] = await Promise.all([
+    prisma.profile.findUnique({ where: { userId: user.id }, select: { trainingDays: true } }),
+    prisma.workoutPlan.findFirst({ where: { id: templatePlanId, isTemplate: true, isActive: true }, include: { templates: { orderBy: { dayNumber: "asc" }, include: { exercises: { orderBy: { orderIndex: "asc" } } } } } }),
+  ]);
+  if (!source) return NextResponse.json({ error: "Programma consigliato non disponibile." }, { status: 404 });
+
+  const count = Math.max(1, Math.min(source.templates.length, 7));
+  const weekdays = weekdaysFor(profile?.trainingDays === count ? count : count);
+  const { today, monday } = nextMonday();
+
+  const result = await prisma.$transaction(async tx => {
+    await tx.workoutSchedule.deleteMany({ where: { userId: user.id, scheduledDate: { gte: today }, session: { is: null } } });
+    await tx.workoutPlan.updateMany({ where: { userId: user.id, isActive: true, isTemplate: false }, data: { isActive: false } });
+    const plan = await tx.workoutPlan.create({
+      data: {
+        userId: user.id,
+        name: source.name,
+        version: source.version,
+        isActive: true,
+        isTemplate: false,
+        templates: {
+          create: source.templates.map(day => ({
+            dayNumber: day.dayNumber,
+            name: day.name,
+            estimatedMins: day.estimatedMins,
+            exercises: { create: day.exercises.map(ex => ({ exerciseId: ex.exerciseId, orderIndex: ex.orderIndex, sets: ex.sets, repMin: ex.repMin, repMax: ex.repMax, rirTarget: ex.rirTarget, restSeconds: ex.restSeconds, setType: ex.setType, progressionType: ex.progressionType, loadIncrement: ex.loadIncrement, tempo: ex.tempo, targetWeight: ex.targetWeight, notes: ex.notes })) },
+          })),
+        },
+      },
+      include: { templates: { orderBy: { dayNumber: "asc" } } },
+    });
+    const schedules: { userId: string; workoutPlanId: string; templateId: string; scheduledDate: Date }[] = [];
+    for (let week = 0; week < 12; week++) {
+      for (let index = 0; index < plan.templates.length; index++) {
+        const scheduledDate = new Date(monday);
+        scheduledDate.setDate(monday.getDate() + week * 7 + (weekdays[index] - 1));
+        scheduledDate.setHours(12, 0, 0, 0);
+        schedules.push({ userId: user.id, workoutPlanId: plan.id, templateId: plan.templates[index].id, scheduledDate });
+      }
+    }
+    await tx.workoutSchedule.createMany({ data: schedules });
+    return plan;
+  });
+
+  return NextResponse.json({ plan: result, recurrence: { weeks: 12, weekdays } }, { status: 201 });
+}

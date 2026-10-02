@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowLeft, Check, ChevronRight, LogOut, UserRound } from "lucide-react";
+import { ArrowLeft, Check, LogOut } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth";
+import ProfileSettings from "@/components/ProfileSettings";
 
 export default async function ProfilePage() {
   const user = await getCurrentUser();
@@ -54,28 +55,17 @@ export default async function ProfilePage() {
           </div>
         </section>
 
-        <section className="mt-5 rounded-[2rem] border border-[var(--border)] bg-[var(--surface)] p-5 sm:p-7">
-          <div className="flex items-start gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[var(--surface-strong)] text-[var(--accent)]">
-              <UserRound size={18} />
-            </div>
-            <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--muted)]">PREFERENZE</p>
-              <h2 className="mt-1 text-xl font-black tracking-[-0.03em]">Il tuo profilo di allenamento</h2>
-              <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
-                Peso, altezza, obiettivi, giorni di allenamento e preferenze possono essere aggiornati quando vuoi.
-              </p>
-            </div>
-          </div>
-
-          <Link
-            href="/onboarding?edit=1"
-            className="mt-5 flex min-h-12 items-center justify-between rounded-2xl border border-[var(--border)] bg-[var(--background)] px-4 transition hover:border-[var(--foreground)]/20 active:scale-[.99]"
-          >
-            <span className="text-sm font-black">Modifica dati e preferenze</span>
-            <ChevronRight size={17} className="text-[var(--muted)]" />
-          </Link>
-        </section>
+        <ProfileSettings
+          initialWeight={user.profile?.currentWeight ?? null}
+          initialEquipment={(() => {
+            try {
+              const parsed = JSON.parse(user.onboarding?.equipmentJson ?? "[]");
+              return Array.isArray(parsed) ? parsed : [];
+            } catch {
+              return [];
+            }
+          })()}
+        />
 
         <section className="mt-5">
           <form action="/api/auth/logout" method="post">

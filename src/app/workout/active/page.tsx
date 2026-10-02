@@ -128,7 +128,7 @@ export default function ActiveWorkoutPage() {
       const finishResponse = await fetch("/api/workouts/session", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ sessionId }) });
       const finishJson = await finishResponse.json(); if (!finishResponse.ok) throw new Error(finishJson.error || "Impossibile completare l'allenamento.");
       setPhase("ready"); setFinished(true);
-      window.setTimeout(() => { window.location.href = `/progress?completed=1${scheduledDate ? `&date=${scheduledDate}` : ""}`; }, 1200);
+      window.setTimeout(() => { window.location.href = `/calendar?completed=1${scheduledDate ? `&date=${scheduledDate}` : ""}`; }, 1200);
     } catch (errorValue) { setPhase("ready"); setError(errorValue instanceof Error ? errorValue.message : "Errore nel salvataggio."); } finally { setSaving(false); }
   }
 

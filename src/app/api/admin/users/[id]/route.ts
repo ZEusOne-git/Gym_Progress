@@ -18,10 +18,8 @@ function defaultWeekdays(templateCount: number, trainingDays: number | null) {
     6: [1, 2, 3, 4, 5, 6],
     7: [1, 2, 3, 4, 5, 6, 7],
   };
-  const preferred = trainingDays && trainingDays >= 1 && trainingDays <= 7 ? trainingDays : count;
-  return (presets[preferred] ?? presets[count]).slice(0, count).length === count
-    ? (presets[preferred] ?? presets[count]).slice(0, count)
-    : presets[count];
+  const preferred = trainingDays && trainingDays === count ? trainingDays : count;
+  return (presets[preferred] ?? presets[count]).slice(0, count);
 }
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -34,7 +32,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       profile: { select: { firstName: true, age: true, currentWeight: true, targetWeight: true, heightCm: true, experience: true, trainingDays: true, sessionMinutes: true } },
       onboarding: { select: { primaryGoal: true, completedAt: true } },
       plans: { where: { isActive: true }, orderBy: { updatedAt: "desc" }, take: 1, select: { id: true, name: true, updatedAt: true, templates: { orderBy: { dayNumber: "asc" }, select: { id: true, dayNumber: true, name: true, estimatedMins: true, exercises: { orderBy: { orderIndex: "asc" }, select: { id: true, orderIndex: true, sets: true, repMin: true, repMax: true, exercise: { select: { name: true } } } } } } } },
-      sessionsLog: { orderBy: { startedAt: "desc" }, take: 10, select: { id: true, startedAt: true, completedAt: true, plan: { select: { name: true } } },
+      sessionsLog: { orderBy: { startedAt: "desc" }, take: 10, select: { id: true, startedAt: true, completedAt: true, plan: { select: { name: true } } } },
       weightLogs: { orderBy: { recordedAt: "desc" }, take: 12, select: { id: true, weightKg: true, recordedAt: true } },
     },
   });

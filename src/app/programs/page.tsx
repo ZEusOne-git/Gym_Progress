@@ -55,7 +55,11 @@ export default function ProgramsPage() {
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || "Impossibile aggiornare il programma.");
       setCurrent({ id: d.plan.id, name: d.plan.name });
-      setMessage("Programma aggiornato. Il nuovo calendario partirà dalle prossime programmazioni.");
+      setMessage(
+        d.adapted?.count
+          ? `Programma aggiornato. ${d.adapted.count} esercizi sono stati adattati all'attrezzatura disponibile.`
+          : "Programma aggiornato. Il nuovo calendario partirà dalle prossime programmazioni.",
+      );
     } catch (e) {
       setError(e instanceof Error ? e.message : "Errore");
     } finally {

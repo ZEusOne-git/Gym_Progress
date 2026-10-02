@@ -57,6 +57,24 @@ a.btn-outline {
   color: var(--foreground) !important;
 }
 
+/* Legacy utility combinations: the background determines the readable foreground. */
+button[class*="bg-[var(--accent)]"],
+a[class*="bg-[var(--accent)]"],
+button[class*="bg-[var(--accent)]"] *,
+a[class*="bg-[var(--accent)]"] * {
+  color: var(--accent-foreground) !important;
+}
+button[class*="bg-[var(--dark-button)]"],
+a[class*="bg-[var(--dark-button)]"],
+button[class*="bg-black"],
+a[class*="bg-black"] {
+  color: var(--dark-button-foreground) !important;
+}
+button[class*="bg-white"],
+a[class*="bg-white"] {
+  color: var(--dark-button) !important;
+}
+
 /* Safety net for legacy fluorescent buttons that use the Tailwind accent utility directly. */
 [class*="bg-[var(--accent)]"] {
   color: var(--accent-foreground) !important;

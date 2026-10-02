@@ -57,6 +57,20 @@ a.btn-outline {
   color: var(--foreground) !important;
 }
 
+/* Outline controls placed on the fluorescent accent panel must use dark ink. */
+.btn-outline-on-accent,
+button.btn-outline-on-accent,
+a.btn-outline-on-accent {
+  background: transparent !important;
+  border: 1px solid var(--accent-foreground) !important;
+  color: var(--accent-foreground) !important;
+}
+.btn-outline-on-accent:hover,
+button.btn-outline-on-accent:hover,
+a.btn-outline-on-accent:hover {
+  background: color-mix(in srgb, var(--accent-foreground) 8%, transparent) !important;
+}
+
 /* Any element with an explicit accent background must always use dark text. */
 button[class*="bg-[var(--accent)]"],
 a[class*="bg-[var(--accent)]"],
@@ -102,5 +116,5 @@ a[class*="bg-slate-50"] {
   color: var(--accent-foreground) !important;
 }
 
-.btn-accent:hover, .btn-dark:hover, .btn-surface:hover, .btn-outline:hover { filter: brightness(1.06); }
-.btn-accent:disabled, .btn-dark:disabled, .btn-surface:disabled, .btn-outline:disabled { cursor: not-allowed; opacity: .5; filter: none; }
+.btn-accent:hover, .btn-dark:hover, .btn-surface:hover, .btn-outline:hover, .btn-outline-on-accent:hover { filter: brightness(1.06); }
+.btn-accent:disabled, .btn-dark:disabled, .btn-surface:disabled, .btn-outline:disabled, .btn-outline-on-accent:disabled { cursor: not-allowed; opacity: .5; filter: none; }

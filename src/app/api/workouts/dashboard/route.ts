@@ -6,6 +6,7 @@ export async function GET(request: Request) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Non autorizzato" }, { status: 401 });
 
+  try {
   const { searchParams } = new URL(request.url);
   const month = Number(searchParams.get("month"));
   const year = Number(searchParams.get("year"));
@@ -70,4 +71,8 @@ export async function GET(request: Request) {
   });
 
   return NextResponse.json({ plan, schedules, sessions, activeSession, nextSchedule, summary: { completedCount, currentWeight: latestWeight?.weightKg ?? null } });
+  } catch (error) {
+    console.error("[workouts/dashboard GET]", error);
+    return NextResponse.json({ error: "Impossibile caricare la dashboard." }, { status: 500 });
+  }
 }

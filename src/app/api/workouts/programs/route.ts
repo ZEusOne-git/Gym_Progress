@@ -25,6 +25,63 @@ function nextMonday() {
   return { today: date, monday };
 }
 
+const EQUIPMENT_ALIASES: Record<string, string> = {
+  MACHINE: "machines",
+  MACHINES: "machines",
+  CABLE: "machines",
+  CABLE_MACHINE: "machines",
+  SMITH: "machines",
+  BARBELL: "barbells",
+  BARBELLS: "barbells",
+  DUMBBELL: "free_weights",
+  DUMBBELLS: "free_weights",
+  KETTLEBELL: "free_weights",
+  KETTLEBELLS: "free_weights",
+  PLATE: "free_weights",
+  PLATES: "free_weights",
+  TREADMILL: "cardio",
+  BIKE: "cardio",
+  ROWER: "cardio",
+  ELLIPTICAL: "cardio",
+  CARDIO: "cardio",
+};
+
+function parseEquipment(value: string | null | undefined) {
+  if (!value) return [] as string[];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+function planEquipmentFit(
+  plan: { templates: { exercises: { exercise: { equipment: string } }[] }[] },
+  available: string[],
+) {
+  const requirements = plan.templates.flatMap(template =>
+    template.exercises.map(item => parseEquipment(item.exercise.equipment)),
+  );
+  const relevant = requirements.filter(items => items.length > 0);
+  const compatible = relevant.filter(items =>
+    items.some(token => available.includes(EQUIPMENT_ALIASES[token.toUpperCase()] ?? token.toLowerCase())),
+  ).length;
+  const unsupported = [...new Set(
+    relevant
+      .filter(items => !items.some(token => available.includes(EQUIPMENT_ALIASES[token.toUpperCase()] ?? token.toLowerCase())))
+      .flatMap(items => items.map(token => token.toLowerCase())),
+  )];
+
+  return {
+    available,
+    total: relevant.length,
+    compatible,
+    unsupported,
+    percent: relevant.length ? Math.round((compatible / relevant.length) * 100) : 100,
+  };
+}
+
 export async function GET() {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Non autorizzato" }, { status: 401 });

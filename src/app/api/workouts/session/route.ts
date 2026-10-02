@@ -102,7 +102,7 @@ export async function PATCH(request: Request) {
   try {
     const body = await request.json();
     const sessionId = typeof body.sessionId === "string" ? body.sessionId : "";
-    const action = body.action === "pause" ? "pause" : "complete";
+    const action = body.action === "pause" ? "pause" : body.action === "finish" ? "finish" : "complete";
     if (!sessionId) return NextResponse.json({ error: "Sessione non valida." }, { status: 400 });
 
     const session = await prisma.workoutSession.findFirst({
@@ -138,6 +138,17 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "Allenamento in pausa. Riprendilo prima di completarlo." }, { status: 400 });
     }
 
+    if (action === "finish") {
+      const now = new Date();
+      const additionalSeconds = Math.max(0, Math.floor((now.getTime() - session.startedAt.getTime()) / 1000));
+      const finished = await prisma.workoutSession.update({
+        where: { id: sessionId },
+        data: { completedAt: now, endedEarly: true, elapsedSeconds: { increment: additionalSeconds } },
+        select: { id: true, completedAt: true, endedEarly: true, elapsedSeconds: true },
+      });
+      return NextResponse.json({ ok: true, finishedEarly: true, session: finished });
+    }
+
     const currentTemplate = session.schedule?.template ?? (() => {
       const sessionExerciseIds = new Set(session.sets.map(set => set.exerciseId));
       return session.plan.templates.find(template => {
@@ -159,7 +170,7 @@ export async function PATCH(request: Request) {
     const additionalSeconds = Math.max(0, Math.floor((now.getTime() - session.startedAt.getTime()) / 1000));
     const updated = await prisma.workoutSession.update({
       where: { id: sessionId },
-      data: { completedAt: now, elapsedSeconds: { increment: additionalSeconds } },
+      data: { completedAt: now, endedEarly: false, elapsedSeconds: { increment: additionalSeconds } },
       select: { id: true, completedAt: true, elapsedSeconds: true },
     });
     return NextResponse.json({ ok: true, session: updated });

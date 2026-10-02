@@ -63,16 +63,16 @@ export default async function ProfilePage() {
               <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--muted)]">PREFERENZE</p>
               <h2 className="mt-1 text-xl font-black tracking-[-0.03em]">Il tuo profilo di allenamento</h2>
               <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
-                Puoi rivedere le informazioni raccolte durante il setup e aggiornare le tue preferenze.
+                Peso, altezza, obiettivi, giorni di allenamento e preferenze possono essere aggiornati quando vuoi.
               </p>
             </div>
           </div>
 
           <Link
-            href="/onboarding"
+            href="/onboarding?edit=1"
             className="mt-5 flex min-h-12 items-center justify-between rounded-2xl border border-[var(--border)] bg-[var(--background)] px-4 transition hover:border-[var(--foreground)]/20 active:scale-[.99]"
           >
-            <span className="text-sm font-black">Rivedi il profilo</span>
+            <span className="text-sm font-black">Modifica dati e preferenze</span>
             <ChevronRight size={17} className="text-[var(--muted)]" />
           </Link>
         </section>

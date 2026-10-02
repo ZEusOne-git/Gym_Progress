@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Check, ChevronRight, Clock3, Loader2, Play, SkipForward, TimerReset, Trophy } from "lucide-react";
 
@@ -86,7 +86,7 @@ export default function ActiveWorkoutPage() {
     };
     document.addEventListener("visibilitychange", onVisibilityChange);
     return () => document.removeEventListener("visibilitychange", onVisibilityChange);
-  }, [sessionId, isPaused, finished, storedElapsed]);
+  }, [sessionId, isPaused, finished, storedElapsed, pauseWorkout]);
 
   useEffect(() => {
     if (phase !== "working" && phase !== "rest") return;
@@ -126,7 +126,7 @@ export default function ActiveWorkoutPage() {
     setLogs(previous => ({ ...previous, [exercise.id]: (previous[exercise.id] ?? exerciseLogs).map(item => item.setNumber === currentSet.setNumber ? { ...item, [field]: field === "rir" ? (value === "" ? null : Number(value)) : Number(value) } : item) }));
   }
 
-  async function pauseWorkout(silent = false) {
+  const pauseWorkout = useCallback(async (silent = false) => {
     if (!sessionId || isPaused || finished) return;
     try {
       const response = await fetch("/api/workouts/session", {
@@ -148,7 +148,7 @@ export default function ActiveWorkoutPage() {
     } catch (errorValue) {
       if (!silent) setError(errorValue instanceof Error ? errorValue.message : "Impossibile mettere in pausa l'allenamento.");
     }
-  }
+  }, [sessionId, isPaused, finished, storedElapsed]);
 
   async function exitWorkout() {
     if (!sessionId) {

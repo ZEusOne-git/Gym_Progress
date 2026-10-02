@@ -72,7 +72,8 @@ export default function ActiveWorkoutPage() {
   }, [sessionId, phase]);
 
   useEffect(() => {
-    if (phase === "rest" && phaseSeconds <= 0) setPhase("idle");
+    if (phase !== "rest" || phaseSeconds > 0) return;
+    setPhase("idle");
   }, [phase, phaseSeconds]);
 
   useEffect(() => {
@@ -112,13 +113,28 @@ export default function ActiveWorkoutPage() {
       const r = await fetch("/api/workouts/session", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ templateId, date: scheduledDate }) });
       const d = await r.json(); if (!r.ok) throw new Error(d.error || "Impossibile avviare l'allenamento.");
       setSessionId(d.session.id);
+      setCurrentExerciseIndex(0);
+      setCurrentSetIndex(0);
+      setPhase("idle");
+      setPhaseSeconds(0);
     } catch (e) { setError(e instanceof Error ? e.message : "Errore"); } finally { setSaving(false); }
   }
 
   function startSet() {
     if (!currentSet || saving || currentSet.completed || phase === "rest") return;
+    setError("");
     setPhase("set");
     setPhaseSeconds(0);
+  }
+
+  function advanceToNextExercise() {
+    if (!data || isLastExercise) return;
+    setCurrentExerciseIndex(index => Math.min(index + 1, data.template.exercises.length - 1));
+    setCurrentSetIndex(0);
+    setPhase("idle");
+    setPhaseSeconds(0);
+    setError("");
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   async function completeCurrentSet() {
@@ -132,7 +148,15 @@ export default function ActiveWorkoutPage() {
       if (!isLastSet) {
         setCurrentSetIndex(index => index + 1);
         if (currentExercise.restSeconds > 0) { setPhase("rest"); setPhaseSeconds(currentExercise.restSeconds); } else setPhase("idle");
-      } else setPhase("idle");
+      } else if (!isLastExercise) {
+        setCurrentExerciseIndex(index => index + 1);
+        setCurrentSetIndex(0);
+        if (currentExercise.restSeconds > 0) { setPhase("rest"); setPhaseSeconds(currentExercise.restSeconds); } else setPhase("idle");
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      } else {
+        setPhase("idle");
+        setPhaseSeconds(0);
+      }
     } catch (e) { setError(e instanceof Error ? e.message : "Errore nel salvataggio della serie."); }
     finally { setSaving(false); }
   }
@@ -162,7 +186,7 @@ export default function ActiveWorkoutPage() {
         <div className="mt-5 space-y-2">{currentLogs.map((set, index) => <div key={set.setNumber} className={`grid grid-cols-[auto_1fr_1fr_auto] items-end gap-2 rounded-2xl p-3 sm:gap-3 sm:p-4 ${set.completed ? "border border-[var(--accent)]/30 bg-[var(--accent)]/10" : index === currentSetIndex ? "border border-[var(--accent)] bg-[var(--surface-strong)]" : "bg-[var(--surface-strong)]"}`}><div className="pb-3 text-sm font-black">#{set.setNumber}</div><label className="text-xs font-bold text-[var(--muted)]">Kg<input type="number" min="0" step="0.5" value={set.weight} disabled={set.completed || saving} onChange={e => updateSet(currentExercise.id, set.setNumber, "weight", e.target.value)} className="mt-1 w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 font-black text-[var(--foreground)] outline-none focus:border-[var(--accent)] disabled:opacity-60"/></label><label className="text-xs font-bold text-[var(--muted)]">Reps<input type="number" min="0" value={set.reps} disabled={set.completed || saving} onChange={e => updateSet(currentExercise.id, set.setNumber, "reps", e.target.value)} className="mt-1 w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 font-black text-[var(--foreground)] outline-none focus:border-[var(--accent)] disabled:opacity-60"/></label><span className={`mb-0.5 inline-flex min-h-11 items-center justify-center rounded-xl px-3 text-xs font-black ${set.completed ? "bg-[var(--accent)] text-[var(--accent-foreground)]" : index === currentSetIndex ? "bg-[var(--surface)] text-[var(--muted)]" : "bg-[var(--background)] text-[var(--muted)]"}`}>{set.completed ? <><Check size={15}/> FATTA</> : index === currentSetIndex ? "SERIE ATTIVA" : "IN ATTESA"}</span></div>)}</div></div></section>
     </>}
 
-    {sessionId && currentExerciseCompleted && <section className="mt-5 rounded-[2rem] bg-[var(--accent)] p-6 text-[var(--accent-foreground)] shadow-xl"><p className="text-xs font-black uppercase tracking-[0.18em] opacity-70">ESERCIZIO COMPLETATO</p><h2 className="mt-2 text-2xl font-black">{isLastExercise ? "Hai finito la scheda." : "Pronto per il prossimo esercizio?"}</h2><p className="mt-2 text-sm opacity-80">{isLastExercise ? "Tutte le serie sono registrate. Ora puoi chiudere l'allenamento." : `Hai completato ${currentExercise.exercise.name}. Restiamo nella stessa schermata e passiamo al prossimo.`}</p>{isLastExercise ? <button type="button" onClick={finishWorkout} disabled={saving || !allCompleted} className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[var(--accent-foreground)] px-5 py-4 text-sm font-black !text-white disabled:opacity-40"><Check size={18}/> {saving ? "SALVATAGGIO..." : "COMPLETA ALLENAMENTO"}</button> : <button type="button" onClick={() => { setCurrentExerciseIndex(index => index + 1); setCurrentSetIndex(0); setPhase("idle"); setPhaseSeconds(0); }} className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[var(--accent-foreground)] px-5 py-4 text-sm font-black !text-white"><ChevronRight size={18}/> PROSEGUI AL PROSSIMO ESERCIZIO</button>}</section>}
+    {sessionId && currentExerciseCompleted && <section className="mt-5 rounded-[2rem] bg-[var(--accent)] p-6 text-[var(--accent-foreground)] shadow-xl"><p className="text-xs font-black uppercase tracking-[0.18em] opacity-70">ESERCIZIO COMPLETATO</p><h2 className="mt-2 text-2xl font-black">{isLastExercise ? "Hai finito la scheda." : "Pronto per il prossimo esercizio?"}</h2><p className="mt-2 text-sm opacity-80">{isLastExercise ? "Tutte le serie sono registrate. Ora puoi chiudere l'allenamento." : `Hai completato ${currentExercise.exercise.name}. Passiamo al prossimo esercizio.`}</p>{isLastExercise ? <button type="button" onClick={finishWorkout} disabled={saving || !allCompleted} className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[var(--accent-foreground)] px-5 py-4 text-sm font-black !text-white disabled:opacity-40"><Check size={18}/> {saving ? "SALVATAGGIO..." : "COMPLETA ALLENAMENTO"}</button> : <button type="button" onClick={advanceToNextExercise} className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[var(--accent-foreground)] px-5 py-4 text-sm font-black !text-white"><ChevronRight size={18}/> PROSEGUI AL PROSSIMO ESERCIZIO</button>}</section>}
 
     {error && <p className="mt-5 rounded-2xl border border-red-500/30 bg-red-500/10 p-3 text-sm font-bold text-red-500">{error}</p>}
   </div>

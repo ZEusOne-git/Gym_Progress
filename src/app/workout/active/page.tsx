@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Check, ChevronRight, Clock3, Loader2, Play, SkipForward, TimerReset, Trophy } from "lucide-react";
 
@@ -38,6 +38,7 @@ export default function ActiveWorkoutPage() {
   const [startedAt, setStartedAt] = useState<string | null>(null);
   const [storedElapsed, setStoredElapsed] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
+  const pauseInFlightRef = useRef(false);
 
   const query = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
   const templateId = query?.get("template");
@@ -67,7 +68,8 @@ export default function ActiveWorkoutPage() {
   }, [templateId, scheduledDate]);
 
   const pauseWorkout = useCallback(async (silent = false) => {
-    if (!sessionId || isPaused || finished) return;
+    if (!sessionId || isPaused || finished || pauseInFlightRef.current) return false;
+    pauseInFlightRef.current = true;
     try {
       const response = await fetch("/api/workouts/session", {
         method: "PATCH",
@@ -85,8 +87,12 @@ export default function ActiveWorkoutPage() {
       setPhase("ready");
       setTimer(0);
       if (!silent) setError("");
+      return true;
     } catch (errorValue) {
       if (!silent) setError(errorValue instanceof Error ? errorValue.message : "Impossibile mettere in pausa l'allenamento.");
+      return false;
+    } finally {
+      pauseInFlightRef.current = false;
     }
   }, [sessionId, isPaused, finished, storedElapsed]);
 
@@ -105,11 +111,16 @@ export default function ActiveWorkoutPage() {
 
   useEffect(() => {
     if (!sessionId || isPaused || finished) return;
-    const onVisibilityChange = () => {
+    const pauseWhenHidden = () => {
       if (document.visibilityState === "hidden") void pauseWorkout(true);
     };
-    document.addEventListener("visibilitychange", onVisibilityChange);
-    return () => document.removeEventListener("visibilitychange", onVisibilityChange);
+    const pauseOnPageHide = () => void pauseWorkout(true);
+    document.addEventListener("visibilitychange", pauseWhenHidden);
+    window.addEventListener("pagehide", pauseOnPageHide);
+    return () => {
+      document.removeEventListener("visibilitychange", pauseWhenHidden);
+      window.removeEventListener("pagehide", pauseOnPageHide);
+    };
   }, [sessionId, isPaused, finished, storedElapsed, pauseWorkout]);
 
   useEffect(() => {
@@ -156,8 +167,9 @@ export default function ActiveWorkoutPage() {
       return;
     }
     setSaving(true);
-    await pauseWorkout();
-    window.location.href = "/calendar";
+    const paused = await pauseWorkout();
+    if (paused) window.location.href = "/calendar";
+    else setSaving(false);
   }
 
   async function startWorkout() {

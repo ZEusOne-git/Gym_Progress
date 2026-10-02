@@ -1,23 +1,185 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { ArrowLeft, BarChart3, CalendarDays, Check, Dumbbell, UserRound } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { ArrowLeft, Check, ChevronRight, Dumbbell, Sparkles } from "lucide-react";
 
-type Plan = { id: string; name: string; templates: { id: string; dayNumber: number; name: string; estimatedMins: number | null; _count: { exercises: number } }[] };
-const navItems = [["Dashboard", "/dashboard", BarChart3], ["Progress", "/progress", BarChart3], ["Calendario", "/calendar", CalendarDays], ["Profilo", "/profile", UserRound]] as const;
+type Plan = {
+  id: string;
+  name: string;
+  templates: {
+    id: string;
+    dayNumber: number;
+    name: string;
+    estimatedMins: number | null;
+    _count: { exercises: number };
+  }[];
+};
 
 export default function ProgramsPage() {
-  const [plans, setPlans] = useState<Plan[]>([]); const [current, setCurrent] = useState<{ id: string; name: string } | null>(null); const [loading, setLoading] = useState(true); const [saving, setSaving] = useState<string | null>(null); const [message, setMessage] = useState(""); const [error, setError] = useState("");
-  useEffect(() => { fetch("/api/workouts/programs").then(async r => { const d = await r.json(); if (!r.ok) throw new Error(d.error || "Impossibile caricare i programmi."); setPlans(d.plans || []); setCurrent(d.current || null); }).catch(e => setError(e instanceof Error ? e.message : "Errore")).finally(() => setLoading(false)); }, []);
-  async function choose(id: string) { setSaving(id); setError(""); setMessage(""); try { const r = await fetch("/api/workouts/programs", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ templatePlanId: id }) }); const d = await r.json(); if (!r.ok) throw new Error(d.error || "Impossibile aggiornare il programma."); setCurrent({ id: d.plan.id, name: d.plan.name }); setMessage("Programma aggiornato. Il nuovo calendario parte dalla prossima settimana."); } catch (e) { setError(e instanceof Error ? e.message : "Errore"); } finally { setSaving(null); } }
-  return <main className="min-h-screen bg-[var(--background)] pb-28"><div className="mx-auto max-w-5xl px-5 py-6 sm:px-8"><Link href="/dashboard" className="inline-flex items-center gap-2 text-sm font-bold text-[var(--muted)]"><ArrowLeft size={17}/> Dashboard</Link><header className="mt-8"><p className="text-xs font-black tracking-[0.22em] text-[var(--accent)]">PROGRAMMI CONSIGLIATI</p><h1 className="mt-2 text-4xl font-black tracking-tight">Scegli il tuo prossimo piano</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--muted)]">Puoi cambiare programma quando vuoi. Il nuovo piano sostituisce le programmazioni future non ancora iniziate e crea automaticamente la nuova ricorrenza settimanale.</p></header>
-    {current && <section className="mt-6 rounded-[2rem] border border-[var(--accent)]/30 bg-[var(--accent)]/10 p-5"><p className="text-xs font-black uppercase tracking-wider text-[var(--accent)]">PIANO ATTUALE</p><div className="mt-2 flex items-center gap-3"><Check className="text-[var(--accent)]" size={20}/><p className="text-xl font-black">{current.name}</p></div></section>}
-    {message && <p className="mt-5 rounded-2xl border border-[var(--accent)]/30 bg-[var(--accent)]/10 p-4 text-sm font-bold text-[var(--accent)]">{message}</p>}
-    {error && <p className="mt-5 rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm font-bold text-red-400">{error}</p>}
-    <section className="mt-6 grid gap-4 md:grid-cols-2">{plans.map(plan => { const active = current?.name === plan.name; return <article key={plan.id} className="rounded-[2rem] border border-[var(--border)] bg-[var(--surface)] p-6"><div className="flex items-start justify-between gap-4"><div><Dumbbell className="text-[var(--accent)]" size={20}/><h2 className="mt-4 text-2xl font-black">{plan.name}</h2><p className="mt-1 text-sm text-[var(--muted)]">{plan.templates.length} giorni di allenamento</p></div>{active && <span className="rounded-full bg-[var(--accent)] px-3 py-1 text-[10px] font-black text-[var(--accent-foreground)]">ATTIVO</span>}</div><div className="mt-5 space-y-2">{plan.templates.map(t => <div key={t.id} className="flex items-center justify-between rounded-2xl bg-[var(--surface-strong)] px-4 py-3"><div><p className="text-[10px] font-black uppercase text-[var(--muted)]">Giorno {t.dayNumber}</p><p className="font-black">{t.name}</p></div><span className="text-xs font-bold text-[var(--muted)]">{t._count.exercises} esercizi{t.estimatedMins ? ` · ${t.estimatedMins} min` : ""}</span></div>)}</div>{!active && <button type="button" onClick={() => choose(plan.id)} disabled={saving !== null} className="btn-accent mt-5 w-full rounded-2xl px-5 py-3.5 text-sm font-black">{saving === plan.id ? "AGGIORNAMENTO..." : "SCEGLI QUESTO PROGRAMMA"}</button>}</article>; })}</section>
-    {!loading && plans.length === 0 && <div className="mt-6 rounded-[2rem] border border-[var(--border)] bg-[var(--surface)] p-6 text-sm text-[var(--muted)]">Non ci sono ancora programmi consigliati disponibili.</div>}
-    {loading && <p className="mt-6 text-sm text-[var(--muted)]">Caricamento programmi...</p>}
-    <nav className="fixed inset-x-0 bottom-4 z-20 mx-auto flex w-[calc(100%-2rem)] max-w-md items-center justify-around rounded-3xl border border-[var(--border)] bg-[var(--surface)]/95 p-2 shadow-2xl backdrop-blur-xl">{navItems.map(([label, href, Icon]) => <Link key={label} href={href} className="flex min-w-16 flex-col items-center gap-1 rounded-2xl px-3 py-2 text-[10px] font-bold text-[var(--muted)]"><Icon size={17}/>{label}</Link>)}</nav>
-  </div></main>;
+  const [plans, setPlans] = useState<Plan[]>([]);
+  const [current, setCurrent] = useState<{ id: string; name: string } | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState<string | null>(null);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    fetch("/api/workouts/programs")
+      .then(async r => {
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.error || "Impossibile caricare i programmi.");
+        setPlans(d.plans || []);
+        setCurrent(d.current || null);
+      })
+      .catch(e => setError(e instanceof Error ? e.message : "Errore"))
+      .finally(() => setLoading(false));
+  }, []);
+
+  async function choose(id: string) {
+    setSaving(id);
+    setError("");
+    setMessage("");
+    try {
+      const r = await fetch("/api/workouts/programs", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ templatePlanId: id }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "Impossibile aggiornare il programma.");
+      setCurrent({ id: d.plan.id, name: d.plan.name });
+      setMessage("Programma aggiornato. Il nuovo calendario partirà dalle prossime programmazioni.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Errore");
+    } finally {
+      setSaving(null);
+    }
+  }
+
+  const activePlan = useMemo(
+    () => plans.find(p => p.name === current?.name) ?? null,
+    [plans, current?.name]
+  );
+
+  return (
+    <main className="min-h-[100dvh] bg-[var(--background)] pb-28">
+      <div className="mx-auto max-w-5xl px-5 py-7 sm:px-8 sm:py-10">
+        <Link href="/dashboard" className="inline-flex items-center gap-2 text-sm font-bold text-[var(--muted)] transition hover:text-[var(--foreground)]">
+          <ArrowLeft size={17} /> Dashboard
+        </Link>
+
+        <header className="mt-8">
+          <p className="text-[10px] font-black tracking-[0.3em] text-[var(--accent)]">PROGRAMMI</p>
+          <h1 className="mt-2 max-w-2xl text-4xl font-black tracking-[-0.055em] sm:text-5xl">Scegli il tuo percorso.</h1>
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-[var(--muted)]">
+            Ogni programma prepara automaticamente le tue sessioni. Tu devi solo aprire l'allenamento e seguirlo.
+          </p>
+        </header>
+
+        {activePlan && (
+          <section className="mt-8 overflow-hidden rounded-[2rem] border border-[var(--accent)]/25 bg-[var(--accent)]/10 p-5 sm:p-7">
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[var(--accent)] text-[var(--accent-foreground)]">
+                <Check size={18} strokeWidth={3} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--accent)]">PROGRAMMA ATTIVO</p>
+                <p className="mt-1 truncate text-xl font-black">{activePlan.name}</p>
+                <p className="mt-1 text-sm text-[var(--muted)]">
+                  {activePlan.templates.length} giorni · {activePlan.templates.reduce((total, t) => total + t._count.exercises, 0)} esercizi programmati
+                </p>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {message && (
+          <div className="mt-5 rounded-2xl border border-[var(--accent)]/25 bg-[var(--accent)]/10 px-4 py-3 text-sm font-bold text-[var(--accent)]">
+            {message}
+          </div>
+        )}
+        {error && (
+          <div className="mt-5 rounded-2xl border border-red-500/25 bg-red-500/10 px-4 py-3 text-sm font-bold text-red-400">
+            {error}
+          </div>
+        )}
+
+        <section className="mt-8 space-y-4">
+          {plans.map((plan, index) => {
+            const active = current?.id === plan.id || current?.name === plan.name;
+            const totalExercises = plan.templates.reduce((total, t) => total + t._count.exercises, 0);
+            return (
+              <article
+                key={plan.id}
+                className={"overflow-hidden rounded-[2rem] border bg-[var(--surface)] transition duration-300 " + (active
+                  ? "border-[var(--accent)]/35 shadow-[0_16px_50px_rgba(0,0,0,.10)]"
+                  : "border-[var(--border)] hover:-translate-y-0.5 hover:border-[var(--foreground)]/20")}
+              >
+                <div className="p-5 sm:p-7">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--accent)]">
+                        {index === 0 ? <Sparkles size={14} /> : <Dumbbell size={14} />}
+                        {active ? "Attivo" : "Disponibile"}
+                      </div>
+                      <h2 className="mt-3 text-2xl font-black tracking-[-0.04em] sm:text-3xl">{plan.name}</h2>
+                      <p className="mt-2 text-sm text-[var(--muted)]">
+                        {plan.templates.length} giorni di allenamento · {totalExercises} esercizi
+                      </p>
+                    </div>
+                    {active && (
+                      <span className="shrink-0 rounded-full bg-[var(--accent)] px-3 py-1.5 text-[9px] font-black text-[var(--accent-foreground)]">
+                        ATTIVO
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="mt-6 divide-y divide-[var(--border)] border-y border-[var(--border)]">
+                    {plan.templates.map(template => (
+                      <div key={template.id} className="flex min-h-16 items-center justify-between gap-4 py-3.5">
+                        <div className="min-w-0">
+                          <p className="text-[9px] font-black uppercase tracking-[0.18em] text-[var(--muted)]">Giorno {template.dayNumber}</p>
+                          <p className="mt-1 truncate text-sm font-black sm:text-base">{template.name}</p>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-2 text-[10px] font-bold text-[var(--muted)]">
+                          <span>{template._count.exercises} esercizi</span>
+                          {template.estimatedMins ? <span>· {template.estimatedMins} min</span> : null}
+                          <ChevronRight size={14} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {!active && (
+                    <button
+                      type="button"
+                      onClick={() => choose(plan.id)}
+                      disabled={saving !== null}
+                      className="mt-5 flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[var(--accent)] px-5 py-3.5 text-sm font-black text-[var(--accent-foreground)] transition active:scale-[.985] disabled:cursor-wait disabled:opacity-60"
+                    >
+                      {saving === plan.id ? "AGGIORNAMENTO..." : "SCEGLI PROGRAMMA"}
+                    </button>
+                  )}
+                </div>
+              </article>
+            );
+          })}
+        </section>
+
+        {!loading && plans.length === 0 && (
+          <div className="mt-8 rounded-[2rem] border border-[var(--border)] bg-[var(--surface)] p-6 text-sm leading-6 text-[var(--muted)]">
+            Non ci sono ancora programmi disponibili.
+          </div>
+        )}
+
+        {loading && (
+          <div className="mt-8 animate-pulse space-y-4">
+            <div className="h-52 rounded-[2rem] bg-[var(--surface)]" />
+            <div className="h-52 rounded-[2rem] bg-[var(--surface)]" />
+          </div>
+        )}
+      </div>
+    </main>
+  );
 }

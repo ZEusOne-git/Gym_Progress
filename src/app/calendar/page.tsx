@@ -14,7 +14,8 @@ const keyOf = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padSta
 const addDays = (d: Date, n: number) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
 const sameDay = (a: Date, b: Date) => keyOf(a) === keyOf(b);
 const monthStart = (d: Date) => new Date(d.getFullYear(), d.getMonth(), 1);
-const spring = "transform 460ms cubic-bezier(.16,1,.3,1)";
+const monthKey = (d: Date) => `${d.getFullYear()}-${d.getMonth()}`;
+const spring = "transform 420ms cubic-bezier(.16,1,.3,1)";
 
 export default function CalendarPage() {
   const [selected, setSelected] = useState(new Date());
@@ -29,27 +30,37 @@ export default function CalendarPage() {
   const dragXRef = useRef(0);
   const wheelDelta = useRef(0);
   const wheelReset = useRef<number | null>(null);
+  const loadedMonths = useRef(new Set<string>());
   const carouselRef = useRef<HTMLDivElement | null>(null);
   const selectedKey = keyOf(selected);
   const today = new Date();
 
-  async function load() {
-    setLoading(true);
+  async function loadMonths(anchor: Date, showLoading = false) {
+    if (showLoading) setLoading(true);
     setError("");
     try {
-      const center = monthStart(selected);
-      const months = [-1, 0, 1].map(offset => new Date(center.getFullYear(), center.getMonth() + offset, 1));
-      const responses = await Promise.all(months.map(month => fetch(`/api/workouts/dashboard?year=${month.getFullYear()}&month=${month.getMonth()}`).then(r => r.json())));
+      const center = monthStart(anchor);
+      const months = [-2, -1, 0, 1, 2].map(offset => new Date(center.getFullYear(), center.getMonth() + offset, 1));
+      const missing = months.filter(month => !loadedMonths.current.has(monthKey(month)));
+      if (missing.length === 0) {
+        if (showLoading) setLoading(false);
+        return;
+      }
+      const responses = await Promise.all(missing.map(month => fetch(`/api/workouts/dashboard?year=${month.getFullYear()}&month=${month.getMonth()}`).then(r => {
+        if (!r.ok) throw new Error("Impossibile caricare il calendario.");
+        return r.json();
+      })));
       const valid = responses.filter((item): item is Data => Boolean(item && typeof item === "object"));
-      const base = valid.find(item => item.plan) ?? valid[0];
+      const base = data ?? valid.find(item => item.plan) ?? valid[0];
       if (!base) throw new Error("Impossibile caricare il calendario.");
-      const merged = new Map<string, Schedule>();
+      const merged = new Map<string, Schedule>((data?.schedules ?? []).map(schedule => [schedule.id, schedule]));
       valid.forEach(item => item.schedules?.forEach(schedule => merged.set(schedule.id, schedule)));
-      setData({ ...base, schedules: [...merged.values()].sort((a, b) => a.scheduledDate.localeCompare(b.scheduledDate)) });
+      missing.forEach(month => loadedMonths.current.add(monthKey(month)));
+      setData(current => ({ ...(current ?? base), ...base, schedules: [...merged.values()].sort((a, b) => a.scheduledDate.localeCompare(b.scheduledDate)) }));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Impossibile caricare il calendario.");
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
     }
   }
 
@@ -68,9 +79,37 @@ export default function CalendarPage() {
       if (!result.user) window.location.href = "/login?next=/calendar";
       else if (result.user.role === "USER" && !result.user.onboarding?.completedAt) window.location.href = "/onboarding";
     });
+    void loadMonths(new Date(), true);
   }, []);
 
-  useEffect(() => { void load(); }, [monthStart(selected).getTime()]);
+  useEffect(() => {
+    if (loading) return;
+    void loadMonths(selected, false);
+  }, [monthKey(selected)]);
+
+  useEffect(() => {
+    const el = carouselRef.current;
+    if (!el) return;
+    const onWheel = (event: WheelEvent) => {
+      if (animating) return;
+      const horizontal = Math.abs(event.deltaX) >= Math.abs(event.deltaY) ? event.deltaX : (event.shiftKey ? event.deltaY : 0);
+      if (Math.abs(horizontal) < 0.5) return;
+      event.preventDefault();
+      wheelDelta.current += horizontal;
+      if (wheelReset.current !== null) window.clearTimeout(wheelReset.current);
+      wheelReset.current = window.setTimeout(() => { wheelDelta.current = 0; }, 140);
+      if (Math.abs(wheelDelta.current) >= 70) {
+        const direction = wheelDelta.current > 0 ? 1 : -1;
+        wheelDelta.current = 0;
+        animateDay(direction);
+      }
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => {
+      el.removeEventListener("wheel", onWheel);
+      if (wheelReset.current !== null) window.clearTimeout(wheelReset.current);
+    };
+  }, [animating]);
 
   const schedules = useMemo(() => new Map((data?.schedules ?? []).map(schedule => [keyOf(new Date(schedule.scheduledDate)), schedule])), [data?.schedules]);
   const selectedSchedule = schedules.get(selectedKey) ?? null;
@@ -102,7 +141,7 @@ export default function CalendarPage() {
       setSelected(current => addDays(current, direction));
       resetDrag();
       setAnimating(false);
-    }, 460);
+    }, 420);
   }
 
   function startPointer(clientX: number) {
@@ -131,24 +170,6 @@ export default function CalendarPage() {
       return;
     }
     animateDay(delta < 0 ? 1 : -1);
-  }
-
-  function handleWheel(event: React.WheelEvent<HTMLDivElement>) {
-    if (animating) {
-      event.preventDefault();
-      return;
-    }
-    const horizontal = Math.abs(event.deltaX) >= Math.abs(event.deltaY) ? event.deltaX : (event.shiftKey ? event.deltaY : 0);
-    if (Math.abs(horizontal) < 0.5) return;
-    event.preventDefault();
-    wheelDelta.current += horizontal;
-    if (wheelReset.current !== null) window.clearTimeout(wheelReset.current);
-    wheelReset.current = window.setTimeout(() => { wheelDelta.current = 0; }, 140);
-    if (Math.abs(wheelDelta.current) >= 70) {
-      const direction = wheelDelta.current > 0 ? 1 : -1;
-      wheelDelta.current = 0;
-      animateDay(direction);
-    }
   }
 
   function selectDay(day: Date) {
@@ -181,7 +202,7 @@ export default function CalendarPage() {
           </div>
         </div>
 
-        <div ref={carouselRef} className="relative mt-7 overflow-hidden border-y border-[var(--border)] py-5 select-none touch-pan-y overscroll-contain" onWheel={handleWheel} onPointerDown={e => { if (e.pointerType === "mouse" && e.buttons !== 1) return; e.currentTarget.setPointerCapture(e.pointerId); startPointer(e.clientX); }} onPointerMove={e => movePointer(e.clientX)} onPointerUp={finishSwipe} onPointerCancel={finishSwipe}>
+        <div ref={carouselRef} className="relative mt-7 overflow-hidden border-y border-[var(--border)] py-5 select-none touch-pan-y overscroll-contain" onPointerDown={e => { if (e.pointerType === "mouse" && e.buttons !== 1) return; e.currentTarget.setPointerCapture(e.pointerId); startPointer(e.clientX); }} onPointerMove={e => movePointer(e.clientX)} onPointerUp={finishSwipe} onPointerCancel={finishSwipe}>
           <div className="pointer-events-none absolute inset-y-0 left-1/3 z-0 w-1/3 bg-[var(--surface)]/20 blur-2xl" />
           <div className="relative z-10 flex h-[112px] w-full items-center will-change-transform" style={{ transform: `translate3d(${dragX}px,0,0)`, transition: dragging ? "none" : spring }}>
             {carouselDays.map((day, index) => {

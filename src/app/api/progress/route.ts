@@ -8,11 +8,11 @@ export async function GET() {
   const recentWindowStart = new Date();
   recentWindowStart.setDate(recentWindowStart.getDate() - 56);
   const [sessions, sets, weights, sessionCount, recentSessions] = await Promise.all([
-    prisma.workoutSession.findMany({ where: { userId: user.id, completedAt: { not: null } }, orderBy: { completedAt: "desc" }, take: 30, select: { id: true, startedAt: true, completedAt: true, plan: { select: { name: true } } } }),
-    prisma.workoutSet.findMany({ where: { session: { userId: user.id, completedAt: { not: null } }, completed: true }, orderBy: { timestamp: "desc" }, take: 1000, select: { id: true, exerciseId: true, setNumber: true, weight: true, reps: true, rir: true, timestamp: true } }),
+    prisma.workoutSession.findMany({ where: { userId: user.id, completedAt: { not: null }, endedEarly: false }, orderBy: { completedAt: "desc" }, take: 30, select: { id: true, startedAt: true, completedAt: true, endedEarly: true, plan: { select: { name: true } } } }),
+    prisma.workoutSet.findMany({ where: { session: { userId: user.id, completedAt: { not: null }, endedEarly: false }, completed: true }, orderBy: { timestamp: "desc" }, take: 1000, select: { id: true, exerciseId: true, setNumber: true, weight: true, reps: true, rir: true, timestamp: true } }),
     prisma.weightLog.findMany({ where: { userId: user.id }, orderBy: { recordedAt: "asc" }, take: 60, select: { id: true, weightKg: true, recordedAt: true } }),
-    prisma.workoutSession.count({ where: { userId: user.id, completedAt: { not: null } } }),
-    prisma.workoutSession.findMany({ where: { userId: user.id, completedAt: { gte: recentWindowStart } }, select: { completedAt: true } }),
+    prisma.workoutSession.count({ where: { userId: user.id, completedAt: { not: null }, endedEarly: false } }),
+    prisma.workoutSession.findMany({ where: { userId: user.id, completedAt: { gte: recentWindowStart }, endedEarly: false }, select: { completedAt: true } }),
   ]);
   const exerciseIds = [...new Set(sets.map(s => s.exerciseId))];
   const exercises = exerciseIds.length ? await prisma.exercise.findMany({ where: { id: { in: exerciseIds } }, select: { id: true, name: true } }) : [];

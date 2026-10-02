@@ -37,9 +37,7 @@ const squat = await prisma.exercise.findUniqueOrThrow({ where: { slug: "barbell-
 const core = await prisma.exercise.findUniqueOrThrow({ where: { slug: "core-finisher" } });
 
 let plan = await prisma.workoutPlan.findFirst({ where: { name: programName, isTemplate: true } });
-if (plan) {
-  await prisma.workoutPlan.delete({ where: { id: plan.id } });
-}
+if (plan) await prisma.workoutPlan.delete({ where: { id: plan.id } });
 
 plan = await prisma.workoutPlan.create({
   data: {
@@ -49,9 +47,9 @@ plan = await prisma.workoutPlan.create({
     isTemplate: true,
     templates: {
       create: [
-        { dayNumber: 1, name: "Gambe", estimatedMins: 50, exercises: { create: [{ exerciseId: squat.id, orderIndex: 0, sets: 4, repMin: 6, repMax: 10, rirTarget: 2, restSeconds: 150, loadIncrement: 2.5 }] } },
-        { dayNumber: 2, name: "Petto", estimatedMins: 45, exercises: { create: [{ exerciseId: bench.id, orderIndex: 0, sets: 4, repMin: 6, repMax: 10, rirTarget: 2, restSeconds: 150, loadIncrement: 2.5 }] } },
-        { dayNumber: 3, name: "Addome", estimatedMins: 25, exercises: { create: [{ exerciseId: core.id, orderIndex: 0, sets: 4, repMin: 10, repMax: 15, rirTarget: 2, restSeconds: 60 }] } },
+        { dayNumber: 1, name: "Gambe", estimatedMins: 50, exercises: { create: [{ exerciseId: squat.id, orderIndex: 0, sets: 4, repMin: 6, repMax: 10, rirTarget: 2, restSeconds: 150, loadIncrement: 2.5, targetWeight: 60 }] } },
+        { dayNumber: 2, name: "Petto", estimatedMins: 45, exercises: { create: [{ exerciseId: bench.id, orderIndex: 0, sets: 4, repMin: 6, repMax: 10, rirTarget: 2, restSeconds: 150, loadIncrement: 2.5, targetWeight: 40 }] } },
+        { dayNumber: 3, name: "Addome", estimatedMins: 25, exercises: { create: [{ exerciseId: core.id, orderIndex: 0, sets: 4, repMin: 10, repMax: 15, rirTarget: 2, restSeconds: 60, loadIncrement: 1.25, targetWeight: 10 }] } },
         { dayNumber: 4, name: "Corsa", estimatedMins: 35, exercises: { create: [{ exerciseId: run.id, orderIndex: 0, sets: 1, repMin: 20, repMax: 30, restSeconds: 0, notes: "Corsa continua: aumenta gradualmente durata o ritmo." }] } },
       ],
     },

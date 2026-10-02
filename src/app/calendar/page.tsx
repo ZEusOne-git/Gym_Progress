@@ -11,7 +11,7 @@ type Schedule = {
   scheduledDate: string;
   templateId: string;
   template: Template;
-  session: { id: string; startedAt: string; pausedAt: string | null; elapsedSeconds: number; completedAt: string | null } | null;
+  session: { id: string; startedAt: string; pausedAt: string | null; elapsedSeconds: number; completedAt: string | null; endedEarly: boolean } | null;
 };
 type Data = { plan: { id: string; name: string; templates: Template[] } | null; schedules: Schedule[]; sessions: { id: string; startedAt: string; completedAt: string | null }[]; nextSchedule: { id: string; scheduledDate: string; template: Template } | null };
 
@@ -28,6 +28,7 @@ export default function CalendarPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState(false);
+  const [endedNotice, setEndedNotice] = useState(false);
   const [dragX, setDragX] = useState(0);
   const [dragging, setDragging] = useState(false);
   const [animating, setAnimating] = useState(false);
@@ -71,11 +72,12 @@ export default function CalendarPage() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get("completed") === "1") {
-      setNotice(true);
-      const value = params.get("date");
-      if (value) {
-        const d = new Date(`${value}T12:00:00`);
+    if (params.get("completed") === "1" || params.get("ended") === "1") {
+      setNotice(params.get("completed") === "1");
+      setEndedNotice(params.get("ended") === "1");
+      const dateValue = params.get("date");
+      if (dateValue) {
+        const d = new Date(dateValue + "T12:00:00");
         if (!Number.isNaN(d.getTime())) setSelected(d);
       }
       window.history.replaceState({}, "", "/calendar");
@@ -118,7 +120,8 @@ export default function CalendarPage() {
 
   const schedules = useMemo(() => new Map((data?.schedules ?? []).map(schedule => [keyOf(new Date(schedule.scheduledDate)), schedule])), [data?.schedules]);
   const selectedSchedule = schedules.get(selectedKey) ?? null;
-  const completed = Boolean(selectedSchedule?.session?.completedAt);
+  const completed = Boolean(selectedSchedule?.session?.completedAt && !selectedSchedule.session.endedEarly);
+  const endedEarly = Boolean(selectedSchedule?.session?.endedEarly);
   const activeSession = Boolean(selectedSchedule?.session && !selectedSchedule.session.completedAt);
   const pausedSession = Boolean(activeSession && selectedSchedule?.session?.pausedAt);
   const isToday = sameDay(selected, today);
@@ -194,7 +197,7 @@ export default function CalendarPage() {
         <h1 className="mt-2 text-4xl font-black tracking-[-0.055em] sm:text-5xl">Calendario</h1>
       </header>
 
-      {notice && <div className="mt-6 flex items-center gap-3 border-y border-[var(--accent)]/20 py-3"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--accent)] text-[var(--accent-foreground)]"><Check size={15} strokeWidth={3}/></span><div><p className="text-sm font-black">Allenamento completato</p><p className="text-xs text-[var(--muted)]">La sessione è stata registrata.</p></div><button type="button" onClick={() => setNotice(false)} className="ml-auto text-lg text-[var(--muted)]" aria-label="Chiudi">×</button></div>}
+      {(notice || endedNotice) && <div className="mt-6 flex items-center gap-3 border-y border-[var(--accent)]/20 py-3"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--accent)] text-[var(--accent-foreground)]"><Check size={15} strokeWidth={3}/></span><div><p className="text-sm font-black">{notice ? "Allenamento completato" : "Allenamento terminato"}</p><p className="text-xs text-[var(--muted)]">{notice ? "La sessione è stata registrata." : "La sessione è stata chiusa. Le serie già registrate restano salvate."}</p></div><button type="button" onClick={() => { setNotice(false); setEndedNotice(false); }} className="ml-auto text-lg text-[var(--muted)]" aria-label="Chiudi">×</button></div>}
 
       <section className="mt-10">
         <div className="flex items-end justify-between gap-4">
@@ -234,7 +237,7 @@ export default function CalendarPage() {
           <div className="hidden items-center gap-1 sm:flex"><button type="button" onClick={() => move(-1)} className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--muted)] hover:bg-[var(--surface)]" aria-label="Giorno precedente"><ChevronLeft size={18}/></button><button type="button" onClick={() => move(1)} className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--muted)] hover:bg-[var(--surface)]" aria-label="Giorno successivo"><ChevronRight size={18}/></button></div>
         </div>
 
-        {loading ? <div className="mt-8 animate-pulse border-y border-[var(--border)] py-8"><div className="h-3 w-24 rounded bg-[var(--surface)]"/><div className="mt-4 h-9 w-64 rounded bg-[var(--surface)]"/><div className="mt-3 h-4 w-80 max-w-full rounded bg-[var(--surface)]"/></div> : selectedSchedule ? <div className="mt-8 border-y border-[var(--border)] py-7 sm:py-8"><div className="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between"><div className="min-w-0"><div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[10px] font-black uppercase tracking-[0.16em] text-[var(--muted)]"><span className="inline-flex items-center gap-2"><Dumbbell size={14} className="text-[var(--accent)]"/> Giorno {selectedSchedule.template.dayNumber}</span><span>{selectedSchedule.template.exercises.length} esercizi</span>{selectedSchedule.template.estimatedMins ? <span className="inline-flex items-center gap-1"><Clock3 size={13}/> {selectedSchedule.template.estimatedMins} min</span> : null}{completed ? <span className="text-[var(--accent)]">COMPLETATO</span> : pausedSession ? <span className="text-white">IN PAUSA</span> : activeSession ? <span className="text-[var(--accent)]">IN CORSO</span> : null}</div><h3 className="mt-3 text-3xl font-black tracking-[-0.045em] sm:text-4xl">{selectedSchedule.template.name}</h3><p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--muted)]">{activeSession ? (pausedSession ? "Hai una sessione in pausa. Riprendi da dove avevi lasciato, senza perdere il tempo già accumulato." : "Hai già iniziato questa sessione. Continua da dove avevi lasciato.") : "Tutto pronto. Entra nell'allenamento e segui ogni serie con il carico consigliato."}</p><div className="mt-6 divide-y divide-[var(--border)] border-y border-[var(--border)]">{selectedSchedule.template.exercises.map((exercise, index) => <div key={exercise.id} className="flex items-center gap-4 py-3.5"><span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--surface-strong)] text-[10px] font-black text-[var(--accent)]">{String(index + 1).padStart(2, "0")}</span><div className="min-w-0 flex-1"><p className="truncate text-sm font-black">{exercise.exercise.name}</p><p className="mt-1 text-[11px] font-bold text-[var(--muted)]">{exercise.sets} serie · {exercise.repMin === exercise.repMax ? exercise.repMin : `${exercise.repMin}–${exercise.repMax}`} reps</p></div></div>)}</div></div><Link
+        {loading ? <div className="mt-8 animate-pulse border-y border-[var(--border)] py-8"><div className="h-3 w-24 rounded bg-[var(--surface)]"/><div className="mt-4 h-9 w-64 rounded bg-[var(--surface)]"/><div className="mt-3 h-4 w-80 max-w-full rounded bg-[var(--surface)]"/></div> : selectedSchedule ? <div className="mt-8 border-y border-[var(--border)] py-7 sm:py-8"><div className="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between"><div className="min-w-0"><div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[10px] font-black uppercase tracking-[0.16em] text-[var(--muted)]"><span className="inline-flex items-center gap-2"><Dumbbell size={14} className="text-[var(--accent)]"/> Giorno {selectedSchedule.template.dayNumber}</span><span>{selectedSchedule.template.exercises.length} esercizi</span>{selectedSchedule.template.estimatedMins ? <span className="inline-flex items-center gap-1"><Clock3 size={13}/> {selectedSchedule.template.estimatedMins} min</span> : null}{completed ? <span className="text-[var(--accent)]">COMPLETATO</span> : endedEarly ? <span className="text-white">TERMINATO</span> : pausedSession ? <span className="text-white">IN PAUSA</span> : activeSession ? <span className="text-[var(--accent)]">IN CORSO</span> : null}</div><h3 className="mt-3 text-3xl font-black tracking-[-0.045em] sm:text-4xl">{selectedSchedule.template.name}</h3><p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--muted)]">{activeSession ? (pausedSession ? "Hai una sessione in pausa. Riprendi da dove avevi lasciato, senza perdere il tempo già accumulato." : "Hai già iniziato questa sessione. Continua da dove avevi lasciato.") : "Tutto pronto. Entra nell'allenamento e segui ogni serie con il carico consigliato."}</p><div className="mt-6 divide-y divide-[var(--border)] border-y border-[var(--border)]">{selectedSchedule.template.exercises.map((exercise, index) => <div key={exercise.id} className="flex items-center gap-4 py-3.5"><span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--surface-strong)] text-[10px] font-black text-[var(--accent)]">{String(index + 1).padStart(2, "0")}</span><div className="min-w-0 flex-1"><p className="truncate text-sm font-black">{exercise.exercise.name}</p><p className="mt-1 text-[11px] font-bold text-[var(--muted)]">{exercise.sets} serie · {exercise.repMin === exercise.repMax ? exercise.repMin : `${exercise.repMin}–${exercise.repMax}`} reps</p></div></div>)}</div></div><Link
             href={completed ? "#" : activeSession ? `/workout/active?template=${selectedSchedule.template.id}&date=${selectedKey}` : `/workout?day=${selectedSchedule.template.dayNumber}&date=${selectedKey}`}
             aria-disabled={completed}
             onClick={event => { if (completed) event.preventDefault(); }}

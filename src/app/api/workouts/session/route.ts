@@ -16,8 +16,28 @@ export async function GET(request: Request) {
   if (!user) return NextResponse.json({ error: "Non autorizzato" }, { status: 401 });
   const url = new URL(request.url);
   const templateId = url.searchParams.get("template");
+  const scheduledDate = parseDate(url.searchParams.get("date"));
   if (!templateId) return NextResponse.json({ session: null });
-  const session = await prisma.workoutSession.findFirst({ where: { userId: user.id, completedAt: null, plan: { isActive: true, isTemplate: false, templates: { some: { id: templateId } } } }, orderBy: { startedAt: "desc" }, select: { id: true, startedAt: true, sets: { orderBy: [{ exerciseId: "asc" }, { setNumber: "asc" }], select: { id: true, exerciseId: true, setNumber: true, weight: true, reps: true, rir: true, completed: true } } } });
+
+  const schedule = scheduledDate
+    ? await prisma.workoutSchedule.findFirst({
+        where: { userId: user.id, templateId, scheduledDate },
+        select: { id: true },
+      })
+    : null;
+
+  const session = schedule
+    ? await prisma.workoutSession.findFirst({
+        where: { userId: user.id, scheduleId: schedule.id, completedAt: null },
+        orderBy: { startedAt: "desc" },
+        select: { id: true, startedAt: true, sets: { orderBy: [{ exerciseId: "asc" }, { setNumber: "asc" }], select: { id: true, exerciseId: true, setNumber: true, weight: true, reps: true, rir: true, completed: true } } },
+      })
+    : await prisma.workoutSession.findFirst({
+        where: { userId: user.id, completedAt: null, plan: { isActive: true, isTemplate: false, templates: { some: { id: templateId } } } },
+        orderBy: { startedAt: "desc" },
+        select: { id: true, startedAt: true, sets: { orderBy: [{ exerciseId: "asc" }, { setNumber: "asc" }], select: { id: true, exerciseId: true, setNumber: true, weight: true, reps: true, rir: true, completed: true } } },
+      });
+
   return NextResponse.json({ session });
 }
 
@@ -30,10 +50,21 @@ export async function POST(request: Request) {
     if (!templateId) return NextResponse.json({ error: "Workout non valido." }, { status: 400 });
     const template = await prisma.workoutTemplate.findFirst({ where: { id: templateId, plan: { userId: user.id, isActive: true, isTemplate: false } }, select: { id: true, workoutPlanId: true } });
     if (!template) return NextResponse.json({ error: "Workout non disponibile." }, { status: 404 });
-    const open = await prisma.workoutSession.findFirst({ where: { userId: user.id, workoutPlanId: template.workoutPlanId, completedAt: null }, orderBy: { startedAt: "desc" } });
-    if (open) return NextResponse.json({ session: open });
+
     const scheduledDate = parseDate(body.date);
-    const schedule = scheduledDate ? await prisma.workoutSchedule.findFirst({ where: { userId: user.id, workoutPlanId: template.workoutPlanId, templateId: template.id, scheduledDate, session: { is: null } }, select: { id: true } }) : null;
+    const schedule = scheduledDate
+      ? await prisma.workoutSchedule.findFirst({ where: { userId: user.id, workoutPlanId: template.workoutPlanId, templateId: template.id, scheduledDate }, select: { id: true } })
+      : null;
+
+    if (schedule) {
+      const existingScheduled = await prisma.workoutSession.findUnique({ where: { scheduleId: schedule.id }, select: { id: true, userId: true, startedAt: true, completedAt: true } });
+      if (existingScheduled?.userId === user.id && !existingScheduled.completedAt) return NextResponse.json({ session: existingScheduled });
+      if (existingScheduled?.completedAt) return NextResponse.json({ error: "Questo allenamento è già stato completato." }, { status: 409 });
+    } else {
+      const open = await prisma.workoutSession.findFirst({ where: { userId: user.id, workoutPlanId: template.workoutPlanId, completedAt: null }, orderBy: { startedAt: "desc" } });
+      if (open) return NextResponse.json({ session: open });
+    }
+
     const session = await prisma.workoutSession.create({ data: { userId: user.id, workoutPlanId: template.workoutPlanId, scheduleId: schedule?.id ?? null } });
     return NextResponse.json({ session }, { status: 201 });
   } catch (error) {

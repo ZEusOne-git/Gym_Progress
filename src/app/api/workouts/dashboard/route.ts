@@ -37,7 +37,7 @@ export async function GET(request: Request) {
 
   if (!plan) return NextResponse.json({ plan: null, schedules: [], sessions: [], activeSession: null, nextSchedule: null });
 
-  const [schedules, sessions, activeSession] = await Promise.all([
+  const [schedules, sessions, activeSession, completedCount, latestWeight] = await Promise.all([
     prisma.workoutSchedule.findMany({
       where: { userId: user.id, workoutPlanId: plan.id, scheduledDate: { gte: from, lt: to } },
       orderBy: { scheduledDate: "asc" },
@@ -59,6 +59,8 @@ export async function GET(request: Request) {
       orderBy: { startedAt: "desc" },
       select: { id: true, startedAt: true, pausedAt: true, elapsedSeconds: true, schedule: { select: { id: true, scheduledDate: true, template: { select: { id: true, dayNumber: true, name: true, estimatedMins: true, exercises: { select: { id: true } } } } } } },
     }),
+    prisma.workoutSession.count({ where: { userId: user.id, completedAt: { not: null } } }),
+    prisma.weightLog.findFirst({ where: { userId: user.id }, orderBy: { recordedAt: "desc" }, select: { weightKg: true } }),
   ]);
 
   const nextSchedule = activeSession?.schedule ?? await prisma.workoutSchedule.findFirst({
@@ -67,5 +69,5 @@ export async function GET(request: Request) {
     select: { id: true, scheduledDate: true, template: { select: { id: true, dayNumber: true, name: true, estimatedMins: true, exercises: { select: { id: true } } } } },
   });
 
-  return NextResponse.json({ plan, schedules, sessions, activeSession, nextSchedule });
+  return NextResponse.json({ plan, schedules, sessions, activeSession, nextSchedule, summary: { completedCount, currentWeight: latestWeight?.weightKg ?? null } });
 }

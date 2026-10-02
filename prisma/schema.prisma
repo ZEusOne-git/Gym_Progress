@@ -209,6 +209,8 @@ model WorkoutSession {
   workoutPlanId String
   scheduleId String? @unique
   startedAt DateTime @default(now())
+  pausedAt DateTime?
+  elapsedSeconds Int @default(0)
   completedAt DateTime?
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   plan WorkoutPlan @relation(fields: [workoutPlanId], references: [id])

@@ -76,6 +76,16 @@ model AuthSession {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
+model LoginThrottle {
+  key String @id
+  attempts Int @default(0)
+  windowStartedAt DateTime @default(now())
+  blockedUntil DateTime?
+  updatedAt DateTime @updatedAt
+
+  @@index([updatedAt])
+}
+
 model Profile {
   id String @id @default(cuid())
   userId String @unique

@@ -37,7 +37,7 @@ a { color: inherit; text-decoration: none; }
 .btn-outline-on-accent, button.btn-outline-on-accent, a.btn-outline-on-accent { background: transparent !important; border: 1px solid var(--accent-foreground) !important; color: var(--accent-foreground) !important; }
 .btn-outline-on-accent:hover, button.btn-outline-on-accent:hover, a.btn-outline-on-accent:hover { background: color-mix(in srgb, var(--accent-foreground) 8%, transparent) !important; }
 
-button[class*="bg-[var(--accent)]"], a[class*="bg-[var(--accent)]"], button[class*="bg-[var(--accent)]"] *, a[class*="bg-[var(--accent)]"] *, button[class*="bg-lime-"], a[class*="bg-lime-"], button[class*="bg-lime-"] *, a[class*="bg-lime-"] *, button[class*="bg-yellow-"], a[class*="bg-yellow-"], button[class*="bg-yellow-"] * { color: var(--accent-foreground) !important; }
+button[class*="bg-[var(--accent)]"], a[class*="bg-[var(--accent)]"], button[class*="bg-[var(--accent)]"] *, a[class*="bg-[var(--accent)]"] *, button[class*="bg-lime-"], a[class*="bg-lime-"], button[class*="bg-lime-"] *, a[class*="bg-lime-"] *, button[class*="bg-yellow-"], a[class*="bg-yellow-"] *, button[class*="bg-yellow-"] { color: var(--accent-foreground) !important; }
 button[class*="bg-[var(--dark-button)]"], a[class*="bg-[var(--dark-button)]"], button[class*="bg-black"], a[class*="bg-black"], button[class*="bg-zinc-900"], a[class*="bg-zinc-900"], button[class*="bg-neutral-900"], a[class*="bg-neutral-900"] { color: var(--dark-button-foreground) !important; }
 button[class*="bg-white"], a[class*="bg-white"], button[class*="bg-gray-50"], a[class*="bg-gray-50"], button[class*="bg-slate-50"], a[class*="bg-slate-50"] { color: var(--dark-button) !important; }
 [class*="bg-[var(--accent)]"], [class*="bg-lime-"], [class*="bg-yellow-"] { color: var(--accent-foreground) !important; }
@@ -68,6 +68,7 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
 [data-calendar-card] > div { transition: transform 420ms cubic-bezier(.22,1,.36,1), background-color 420ms ease, border-color 420ms ease, box-shadow 420ms ease, color 240ms ease; }
 [data-calendar-card]:not(:has(> div.border-[var\(--accent\)])):hover > div { transform: translateY(-2px); }
 
+/* Calendar rail: quiet, compact and touch-first. The selected day stays visually dominant. */
 @media (max-width: 639px) {
   html, body { width: 100%; overflow-x: hidden; }
   body { overscroll-behavior-x: none; }
@@ -76,6 +77,14 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
   [data-calendar-card] > div { height: 92px !important; border-radius: 22px !important; background: color-mix(in srgb, var(--surface) 88%, transparent) !important; border-color: color-mix(in srgb, var(--border) 75%, transparent) !important; box-shadow: none !important; }
   [data-calendar-card]:has(> div.bg-\[var\(--accent\)]) > div { height: 104px !important; border-width: 0 !important; background: var(--accent) !important; box-shadow: 0 18px 40px color-mix(in srgb, var(--accent) 18%, transparent) !important; }
   [data-calendar-card] > div span:last-child { max-width: 76px; font-size: 8px; letter-spacing: .08em; }
+
+  /* The current calendar implementation uses a five-day rail. Keep it calm and legible. */
+  div.touch-pan-y { touch-action: pan-x; overscroll-behavior-x: contain; border-color: color-mix(in srgb, var(--border) 70%, transparent); }
+  div.touch-pan-y > div[class*="grid-cols-5"] { gap: 2px; transform-origin: center; }
+  div.touch-pan-y > div[class*="grid-cols-5"] > button { min-width: 0; padding: 4px 0; transition: transform 360ms cubic-bezier(.22,1,.36,1), opacity 280ms ease; }
+  div.touch-pan-y > div[class*="grid-cols-5"] > button:active { transform: scale(.96); }
+  div.touch-pan-y > div[class*="grid-cols-5"] > button > span:nth-child(2) { box-shadow: 0 8px 22px color-mix(in srgb, var(--foreground) 4%, transparent); }
+  div.touch-pan-y > div[class*="grid-cols-5"] > button:nth-child(3) > span:nth-child(2) { box-shadow: 0 14px 34px color-mix(in srgb, var(--accent) 20%, transparent); }
 
   /* Workout: keep the whole control zone inside the phone viewport. */
   main.min-h-screen { min-height: 100svh; min-height: 100dvh; }

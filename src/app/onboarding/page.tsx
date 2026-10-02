@@ -5,6 +5,8 @@ import { ArrowLeft, ArrowRight, Check, Dumbbell, Target, UserRound, CalendarDays
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
+export const dynamic = "force-dynamic";
+
 const steps = [
   { title: "About you", icon: UserRound },
   { title: "Your body", icon: Ruler },

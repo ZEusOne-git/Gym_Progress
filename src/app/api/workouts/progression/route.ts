@@ -10,14 +10,37 @@ export async function GET(request: Request) {
   const templateId = url.searchParams.get("templateId");
   if (!exerciseId || !templateId) return NextResponse.json({ error: "Esercizio o template mancante." }, { status: 400 });
 
+  // The workout UI may send either a WorkoutExercise id or the underlying
+  // Exercise id. Resolve both to the canonical Exercise id used by history.
   const item = await prisma.workoutExercise.findFirst({
-    where: { exerciseId, templateId, template: { plan: { userId: user.id, isActive: true, isTemplate: false } } },
-    select: { sets: true, repMin: true, repMax: true, rirTarget: true, progressionType: true, loadIncrement: true, targetWeight: true, exercise: { select: { name: true } } },
+    where: {
+      templateId,
+      template: { plan: { userId: user.id, isActive: true, isTemplate: false } },
+      OR: [{ id: exerciseId }, { exerciseId }],
+    },
+    select: {
+      exerciseId: true,
+      sets: true,
+      repMin: true,
+      repMax: true,
+      rirTarget: true,
+      progressionType: true,
+      loadIncrement: true,
+      targetWeight: true,
+      exercise: { select: { name: true } },
+    },
   });
   if (!item) return NextResponse.json({ error: "Esercizio non disponibile nel tuo programma." }, { status: 404 });
 
-  const lastSession = await prisma.workoutSession.findFirst({ where: { userId: user.id, completedAt: { not: null }, sets: { some: { exerciseId } } }, orderBy: { completedAt: "desc" }, select: { id: true, completedAt: true } });
-  const lastSets = lastSession ? await prisma.workoutSet.findMany({ where: { sessionId: lastSession.id, exerciseId, completed: true }, orderBy: { setNumber: "asc" }, select: { setNumber: true, weight: true, reps: true, rir: true } }) : [];
+  const normalizedExerciseId = item.exerciseId;
+  const lastSession = await prisma.workoutSession.findFirst({
+    where: { userId: user.id, completedAt: { not: null }, sets: { some: { exerciseId: normalizedExerciseId } } },
+    orderBy: { completedAt: "desc" },
+    select: { id: true, completedAt: true },
+  });
+  const lastSets = lastSession
+    ? await prisma.workoutSet.findMany({ where: { sessionId: lastSession.id, exerciseId: normalizedExerciseId, completed: true }, orderBy: { setNumber: "asc" }, select: { setNumber: true, weight: true, reps: true, rir: true } })
+    : [];
   const lastWeight = lastSets.length ? Math.max(...lastSets.map(s => s.weight)) : item.targetWeight ?? 0;
   const increment = item.loadIncrement ?? 0;
   const allAtTop = lastSets.length >= item.sets && lastSets.every(s => s.reps >= item.repMax && (item.rirTarget == null || s.rir == null || s.rir >= item.rirTarget));
@@ -25,5 +48,16 @@ export async function GET(request: Request) {
   const suggestedWeight = progression === "DOUBLE_PROGRESSION" && allAtTop && increment > 0 ? lastWeight + increment : lastWeight;
   const suggestedReps = allAtTop ? item.repMin : Math.min(item.repMax, Math.max(item.repMin, (lastSets.length ? Math.max(...lastSets.map(s => s.reps)) + 1 : item.repMin)));
 
-  return NextResponse.json({ last: lastSession ? { completedAt: lastSession.completedAt, sets: lastSets } : null, recommendation: { weight: suggestedWeight, reps: suggestedReps, reason: lastSession ? (allAtTop && increment > 0 ? `Hai raggiunto ${item.repMax} reps con il RIR target: aumenta di ${increment} kg.` : `Mantieni il carico e prova ad avvicinarti a ${item.repMax} reps.`) : "Prima sessione: parti dal carico target della scheda." }, target: { sets: item.sets, repMin: item.repMin, repMax: item.repMax, rir: item.rirTarget, increment, progressionType: progression, weight: item.targetWeight }, exerciseName: item.exercise.name });
+  return NextResponse.json({
+    last: lastSession ? { completedAt: lastSession.completedAt, sets: lastSets } : null,
+    recommendation: {
+      weight: suggestedWeight,
+      reps: suggestedReps,
+      reason: lastSession
+        ? (allAtTop && increment > 0 ? `Hai raggiunto ${item.repMax} reps con il RIR target: aumenta di ${increment} kg.` : `Mantieni il carico e prova ad avvicinarti a ${item.repMax} reps.`)
+        : "Prima sessione: parti dal carico target della scheda.",
+    },
+    target: { sets: item.sets, repMin: item.repMin, repMax: item.repMax, rir: item.rirTarget, increment, progressionType: progression, weight: item.targetWeight },
+    exerciseName: item.exercise.name,
+  });
 }

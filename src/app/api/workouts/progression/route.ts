@@ -10,11 +10,14 @@ export async function GET(request: Request) {
   const templateId = url.searchParams.get("templateId");
   if (!exerciseId || !templateId) return NextResponse.json({ error: "Esercizio o template mancante." }, { status: 400 });
 
-  const item = await prisma.workoutExercise.findFirst({ where: { exerciseId, templateId, template: { workoutPlan: { userId: user.id, isActive: true, isTemplate: false } } }, select: { sets: true, repMin: true, repMax: true, rirTarget: true, progressionType: true, loadIncrement: true, targetWeight: true, exercise: { select: { name: true } } } });
+  const item = await prisma.workoutExercise.findFirst({
+    where: { exerciseId, templateId, template: { plan: { userId: user.id, isActive: true, isTemplate: false } } },
+    select: { sets: true, repMin: true, repMax: true, rirTarget: true, progressionType: true, loadIncrement: true, targetWeight: true, exercise: { select: { name: true } } },
+  });
   if (!item) return NextResponse.json({ error: "Esercizio non disponibile nel tuo programma." }, { status: 404 });
 
-  const lastSession = await prisma.workoutSession.findFirst({ where: { userId: user.id, completedAt: { not: null }, sets: { some: { exerciseId } } }, orderBy: { completedAt: "desc" }, select: { id: true, completedAt: true, sets: { where: { exerciseId, completed: true }, orderBy: { setNumber: "asc" }, select: { setNumber: true, weight: true, reps: true, rir: true } } } });
-  const lastSets = lastSession?.sets ?? [];
+  const lastSession = await prisma.workoutSession.findFirst({ where: { userId: user.id, completedAt: { not: null }, sets: { some: { exerciseId } } }, orderBy: { completedAt: "desc" }, select: { id: true, completedAt: true } });
+  const lastSets = lastSession ? await prisma.workoutSet.findMany({ where: { sessionId: lastSession.id, exerciseId, completed: true }, orderBy: { setNumber: "asc" }, select: { setNumber: true, weight: true, reps: true, rir: true } }) : [];
   const lastWeight = lastSets.length ? Math.max(...lastSets.map(s => s.weight)) : item.targetWeight ?? 0;
   const increment = item.loadIncrement ?? 0;
   const allAtTop = lastSets.length >= item.sets && lastSets.every(s => s.reps >= item.repMax && (item.rirTarget == null || s.rir == null || s.rir >= item.rirTarget));

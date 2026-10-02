@@ -2,61 +2,143 @@ import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 const programName = "TEST · 4 GIORNI · SETTIMANA COMPLETA";
+const demoEmail = "atleta@test.it";
 
-const bench = await prisma.exercise.upsert({
-  where: { slug: "bench-press" },
-  update: { name: "Bench Press", category: "CHEST", primaryMuscles: "CHEST · TRICEPS", isActive: true },
-  create: {
-    name: "Bench Press",
-    slug: "bench-press",
-    category: "CHEST",
-    primaryMuscles: "CHEST · TRICEPS",
-    equipment: JSON.stringify(["BARBELL", "BENCH"]),
-    difficulty: "BEGINNER",
-    instructionsJson: JSON.stringify(["Set your shoulders before unracking.", "Lower the bar with control.", "Press evenly."]),
-    cuesJson: JSON.stringify(["Keep shoulder blades set", "Control the descent", "Drive evenly"]),
-  },
-});
+const exerciseData = [
+  ["bench-press", "Bench Press", "CHEST", "CHEST · TRICEPS", ["BARBELL", "BENCH"]],
+  ["romanian-deadlift", "Romanian Deadlift", "LEGS", "HAMSTRINGS · GLUTES", ["BARBELL"]],
+  ["cable-row", "Cable Row", "BACK", "BACK · BICEPS", ["CABLE"]],
+  ["treadmill-run", "Treadmill Run", "CARDIO", "CARDIO · LEGS", ["TREADMILL"]],
+];
 
-const run = await prisma.exercise.upsert({
-  where: { slug: "treadmill-run" },
-  update: { name: "Treadmill Run", category: "CARDIO", primaryMuscles: "CARDIO · LEGS", isActive: true },
-  create: {
-    name: "Treadmill Run",
-    slug: "treadmill-run",
-    category: "CARDIO",
-    primaryMuscles: "CARDIO · LEGS",
-    equipment: JSON.stringify(["TREADMILL"]),
-    difficulty: "BEGINNER",
-    instructionsJson: JSON.stringify(["Start at an easy pace.", "Keep your posture tall.", "Increase pace gradually."]),
-    cuesJson: JSON.stringify(["Relax your shoulders", "Keep a steady rhythm", "Build pace progressively"]),
-  },
-});
+for (const [slug, name, category, muscles, equipment] of exerciseData) {
+  await prisma.exercise.upsert({
+    where: { slug },
+    update: { name, category, primaryMuscles: muscles, isActive: true },
+    create: {
+      name,
+      slug,
+      category,
+      primaryMuscles: muscles,
+      equipment: JSON.stringify(equipment),
+      difficulty: "BEGINNER",
+      instructionsJson: JSON.stringify(["Mantieni una tecnica controllata.", "Esegui ogni ripetizione con il range completo.", "Fermati se perdi la tecnica."]),
+      cuesJson: JSON.stringify(["Controlla il movimento", "Respira regolarmente", "Mantieni il controllo"]),
+    },
+  });
+}
 
-const squat = await prisma.exercise.findUniqueOrThrow({ where: { slug: "barbell-squat" } });
-const core = await prisma.exercise.findUniqueOrThrow({ where: { slug: "core-finisher" } });
+const exercise = async slug => prisma.exercise.findUniqueOrThrow({ where: { slug } });
+const squat = await exercise("barbell-squat");
+const bench = await exercise("bench-press");
+const rdl = await exercise("romanian-deadlift");
+const pulldown = await exercise("lat-pulldown");
+const row = await exercise("cable-row");
+const shoulder = await exercise("shoulder-press");
+const curl = await exercise("cable-curl");
+const core = await exercise("core-finisher");
+const run = await exercise("treadmill-run");
 
-let plan = await prisma.workoutPlan.findFirst({ where: { name: programName, isTemplate: true } });
-if (plan) await prisma.workoutPlan.delete({ where: { id: plan.id } });
+const days = [
+  { dayNumber: 1, name: "Gambe", estimatedMins: 55, weekday: 1, items: [[squat, 4, 6, 10, 150, 60], [rdl, 3, 8, 12, 120, 50], [core, 3, 10, 15, 60, 10]] },
+  { dayNumber: 2, name: "Petto e schiena", estimatedMins: 55, weekday: 3, items: [[bench, 4, 6, 10, 150, 40], [pulldown, 3, 8, 12, 120, 35], [row, 3, 8, 12, 90, 35]] },
+  { dayNumber: 3, name: "Spalle e braccia", estimatedMins: 45, weekday: 5, items: [[shoulder, 3, 8, 12, 90, 15], [curl, 3, 10, 15, 60, 15], [core, 3, 10, 15, 60, 10]] },
+  { dayNumber: 4, name: "Full body + corsa", estimatedMins: 50, weekday: 7, items: [[squat, 3, 8, 12, 120, 50], [bench, 3, 8, 12, 120, 35], [run, 1, 20, 30, 0, 0]] },
+];
 
-plan = await prisma.workoutPlan.create({
+const oldPlans = await prisma.workoutPlan.findMany({ where: { name: programName } });
+for (const old of oldPlans) {
+  await prisma.workoutSession.deleteMany({ where: { workoutPlanId: old.id } });
+  await prisma.workoutSchedule.deleteMany({ where: { workoutPlanId: old.id } });
+  await prisma.workoutPlan.delete({ where: { id: old.id } });
+}
+
+const template = await prisma.workoutPlan.create({
   data: {
     name: programName,
     version: 1,
     isActive: true,
     isTemplate: true,
     templates: {
-      create: [
-        { dayNumber: 1, name: "Gambe", estimatedMins: 50, exercises: { create: [{ exerciseId: squat.id, orderIndex: 0, sets: 4, repMin: 6, repMax: 10, rirTarget: 2, restSeconds: 150, loadIncrement: 2.5, targetWeight: 60 }] } },
-        { dayNumber: 2, name: "Petto", estimatedMins: 45, exercises: { create: [{ exerciseId: bench.id, orderIndex: 0, sets: 4, repMin: 6, repMax: 10, rirTarget: 2, restSeconds: 150, loadIncrement: 2.5, targetWeight: 40 }] } },
-        { dayNumber: 3, name: "Addome", estimatedMins: 25, exercises: { create: [{ exerciseId: core.id, orderIndex: 0, sets: 4, repMin: 10, repMax: 15, rirTarget: 2, restSeconds: 60, loadIncrement: 1.25, targetWeight: 10 }] } },
-        { dayNumber: 4, name: "Corsa", estimatedMins: 35, exercises: { create: [{ exerciseId: run.id, orderIndex: 0, sets: 1, repMin: 20, repMax: 30, restSeconds: 0, notes: "Corsa continua: aumenta gradualmente durata o ritmo." }] } },
-      ],
+      create: days.map(day => ({
+        dayNumber: day.dayNumber,
+        name: day.name,
+        estimatedMins: day.estimatedMins,
+        exercises: {
+          create: day.items.map(([item, sets, repMin, repMax, restSeconds, targetWeight], orderIndex) => ({
+            exerciseId: item.id,
+            orderIndex,
+            sets,
+            repMin,
+            repMax,
+            rirTarget: 2,
+            restSeconds,
+            progressionType: "DOUBLE_PROGRESSION",
+            loadIncrement: targetWeight > 0 ? 2.5 : null,
+            targetWeight,
+          })),
+        },
+      })),
     },
   },
-  include: { templates: { orderBy: { dayNumber: "asc" } } },
 });
 
-console.log(`Created test program: ${plan.name}`);
-console.log(`Template days: ${plan.templates.map((day) => `${day.dayNumber}=${day.name}`).join(" | ")}`);
+const user = await prisma.user.findUnique({ where: { email: demoEmail }, select: { id: true } });
+if (user) {
+  await prisma.workoutSession.deleteMany({ where: { userId: user.id } });
+  await prisma.workoutSchedule.deleteMany({ where: { userId: user.id } });
+  await prisma.workoutPlan.updateMany({ where: { userId: user.id, isTemplate: false }, data: { isActive: false } });
+
+  const personal = await prisma.workoutPlan.create({
+    data: {
+      userId: user.id,
+      name: programName,
+      version: 1,
+      isActive: true,
+      isTemplate: false,
+      templates: {
+        create: days.map(day => ({
+          dayNumber: day.dayNumber,
+          name: day.name,
+          estimatedMins: day.estimatedMins,
+          exercises: {
+            create: day.items.map(([item, sets, repMin, repMax, restSeconds, targetWeight], orderIndex) => ({
+              exerciseId: item.id,
+              orderIndex,
+              sets,
+              repMin,
+              repMax,
+              rirTarget: 2,
+              restSeconds,
+              progressionType: "DOUBLE_PROGRESSION",
+              loadIncrement: targetWeight > 0 ? 2.5 : null,
+              targetWeight,
+            })),
+          },
+        })),
+      },
+    },
+    include: { templates: { orderBy: { dayNumber: "asc" } } },
+  });
+
+  const start = new Date();
+  start.setHours(12, 0, 0, 0);
+  const monday = new Date(start);
+  monday.setDate(start.getDate() - ((start.getDay() + 6) % 7));
+  monday.setHours(12, 0, 0, 0);
+  const schedules = [];
+  for (let week = 0; week < 12; week++) {
+    for (let index = 0; index < personal.templates.length; index++) {
+      const date = new Date(monday);
+      date.setDate(monday.getDate() + week * 7 + (days[index].weekday - 1));
+      if (date < start) continue;
+      date.setHours(12, 0, 0, 0);
+      schedules.push({ userId: user.id, workoutPlanId: personal.id, templateId: personal.templates[index].id, scheduledDate: date });
+    }
+  }
+  await prisma.workoutSchedule.createMany({ data: schedules });
+  console.log(`Assigned ${programName} to ${demoEmail}: ${schedules.length} scheduled workouts.`);
+}
+
+console.log(`Created ${programName}: 4 training days with ${days.reduce((sum, day) => sum + day.items.length, 0)} exercise slots.`);
 await prisma.$disconnect();

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Activity, CalendarDays, ClipboardList, Dumbbell, Scale, UserRound } from "lucide-react";
 
@@ -25,16 +25,16 @@ export default function AdminUserDetailPage({ params }: { params: Promise<{ id: 
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  const load = async () => {
+  const load = useCallback(async () => {
     const { id } = await params;
     const response = await fetch(`/api/admin/users/${id}`);
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || "Impossibile caricare l'utente");
     setUser(data.user);
     setTemplates(data.templates ?? []);
-  };
+  }, [params]);
 
-  useEffect(() => { load().catch(e => setError(e instanceof Error ? e.message : "Errore")).finally(() => setLoading(false)); }, [params]);
+  useEffect(() => { load().catch(e => setError(e instanceof Error ? e.message : "Errore")).finally(() => setLoading(false)); }, [load]);
   const completed = useMemo(() => user?.sessionsLog.filter(s => s.completedAt).length ?? 0, [user]);
 
   const assignPlan = async () => {

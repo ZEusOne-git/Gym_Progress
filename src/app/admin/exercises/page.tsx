@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useEffect, useState } from "react";
 
 interface Exercise {
@@ -50,7 +51,7 @@ export default function AdminExercisesPage() {
                 <Link key={exercise.id} href={`/admin/exercises/${exercise.id}`} className="group block overflow-hidden rounded-3xl border border-[var(--border)] bg-[var(--surface)] shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-[var(--accent)]">
                   <div className="flex min-h-36 items-center justify-center bg-black/5 p-5">
                     {media?.type === "IMAGE" || media?.type === "GIF" ? (
-                      <img src={media.url} alt={exercise.name} className="max-h-44 w-full rounded-2xl object-contain" />
+                      <Image src={media.url} alt={exercise.name} width={640} height={360} unoptimized className="max-h-44 w-full rounded-2xl object-contain" />
                     ) : (
                       <div className="flex h-28 w-full items-center justify-center rounded-2xl border border-dashed border-[var(--border)] text-sm font-semibold text-[var(--muted)]">
                         {media ? media.type : "Nessun media"}

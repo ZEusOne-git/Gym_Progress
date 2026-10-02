@@ -39,6 +39,9 @@ export default function CalendarPage() {
   const loadedMonths = useRef(new Set<string>());
   const carouselRef = useRef<HTMLDivElement | null>(null);
   const selectedKey = keyOf(selected);
+  const selectedMonthKey = monthKey(selected);
+  const selectedRef = useRef(selected);
+  selectedRef.current = selected;
   const today = new Date();
 
   async function loadMonths(anchor: Date, showLoading = false) {
@@ -70,6 +73,11 @@ export default function CalendarPage() {
     }
   }
 
+  const loadMonthsRef = useRef(loadMonths);
+  loadMonthsRef.current = loadMonths;
+  const animateDayRef = useRef(animateDay);
+  animateDayRef.current = animateDay;
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("completed") === "1" || params.get("ended") === "1") {
@@ -86,13 +94,13 @@ export default function CalendarPage() {
       if (!result.user) window.location.href = "/login?next=/calendar";
       else if (result.user.role === "USER" && !result.user.onboarding?.completedAt) window.location.href = "/onboarding";
     });
-    void loadMonths(new Date(), true);
+    void loadMonthsRef.current(new Date(), true);
   }, []);
 
   useEffect(() => {
     if (loading) return;
-    void loadMonths(selected, false);
-  }, [monthKey(selected)]);
+    void loadMonthsRef.current(selectedRef.current, false);
+  }, [loading, selectedMonthKey]);
 
   useEffect(() => {
     const el = carouselRef.current;
@@ -108,7 +116,7 @@ export default function CalendarPage() {
       if (Math.abs(wheelDelta.current) >= 70) {
         const direction = wheelDelta.current > 0 ? 1 : -1;
         wheelDelta.current = 0;
-        animateDay(direction);
+        animateDayRef.current(direction);
       }
     };
     el.addEventListener("wheel", onWheel, { passive: false });
@@ -125,7 +133,7 @@ export default function CalendarPage() {
   const activeSession = Boolean(selectedSchedule?.session && !selectedSchedule.session.completedAt);
   const pausedSession = Boolean(activeSession && selectedSchedule?.session?.pausedAt);
   const isToday = sameDay(selected, today);
-  const carouselDays = useMemo(() => [addDays(selected, -1), selected, addDays(selected, 1)], [selectedKey]);
+  const carouselDays = useMemo(() => [addDays(selected, -1), selected, addDays(selected, 1)], [selected]);
 
   function move(days: number) {
     if (animating) return;

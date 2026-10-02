@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { ArrowLeft, Check, ChevronRight, Clock3, Loader2, Play, SkipForward, Trophy } from "lucide-react";
 
 type Media = { url: string; type: string; thumbnailUrl: string | null; sourceName: string | null };
@@ -262,7 +263,7 @@ export default function ActiveWorkoutPage() {
     {sessionId && (
       <>
         <div key={`${exercise.id}-${exerciseIndex}`} className="absolute inset-0 animate-[fade-in_500ms_ease-out]">
-          {media?.url && media.type !== "IMAGE" && media.type !== "GIF" ? <video key={media.url} autoPlay muted loop playsInline poster={media.thumbnailUrl ?? undefined} className="absolute inset-0 h-full w-full object-cover" src={media.url} /> : media?.url ? <img src={media.url} alt={`${exercise.exercise.name}${repdbPoses.length > 1 ? poseIndex === 0 ? " · posizione iniziale" : " · posizione di picco" : ""}`} className="absolute inset-0 h-full w-full bg-[#0b1513] object-contain" /> : <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(190,255,38,.2),transparent_52%)]" />}
+          {media?.url && media.type !== "IMAGE" && media.type !== "GIF" ? <video key={media.url} autoPlay muted loop playsInline poster={media.thumbnailUrl ?? undefined} className="absolute inset-0 h-full w-full object-cover" src={media.url} /> : media?.url ? <Image src={media.url} alt={`${exercise.exercise.name}${repdbPoses.length > 1 ? poseIndex === 0 ? " · posizione iniziale" : " · posizione di picco" : ""}`} fill unoptimized sizes="100vw" className="bg-[#0b1513] object-contain" /> : <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(190,255,38,.2),transparent_52%)]" />}
           {repdbPoses.length > 1 && <button type="button" onClick={() => setPoseIndex(value => value === 0 ? 1 : 0)} className="absolute right-4 top-16 z-10 rounded-full border border-white/20 bg-black/45 px-3 py-2 text-[10px] font-black text-white backdrop-blur-xl">{poseIndex === 0 ? "MOSTRA POSIZIONE FINALE" : "MOSTRA POSIZIONE INIZIALE"}</button>}
           <div className="absolute inset-0 bg-black/25" />
           <div className="absolute inset-0 bg-gradient-to-b from-black/75 via-transparent to-black/90" />

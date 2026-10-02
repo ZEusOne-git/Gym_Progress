@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Copy, Pencil, Trash2 } from "lucide-react";
 
@@ -13,8 +13,8 @@ function muscles(v:string){try{const x=JSON.parse(v);return Array.isArray(x)?x.j
 
 export default function ProgramDetail({params}:{params:Promise<{id:string}>}){
  const [program,setProgram]=useState<Program|null>(null);const [loading,setLoading]=useState(true);const [error,setError]=useState("");const [busy,setBusy]=useState(false);
- async function load(){setLoading(true);setError("");try{const {id}=await params;const r=await fetch(`/api/admin/workouts/${id}`,{cache:"no-store"});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||"Programma non trovato");setProgram(d)}catch(e){setError(e instanceof Error?e.message:"Impossibile caricare il programma")}finally{setLoading(false)}}
- useEffect(()=>{load()},[]);
+ const load = useCallback(async () => { setLoading(true); setError(""); try { const { id } = await params; const r = await fetch(`/api/admin/workouts/${id}`, { cache: "no-store" }); const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.error || "Programma non trovato"); setProgram(d); } catch (e) { setError(e instanceof Error ? e.message : "Impossibile caricare il programma"); } finally { setLoading(false); } }, [params]);
+ useEffect(() => { void load(); }, [load]);
  async function duplicate(){if(!program)return;setBusy(true);try{const r=await fetch(`/api/admin/workouts/${program.id}`,{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||"Impossibile duplicare il programma");window.location.href=`/admin/programs/${d.id}`}catch(e){setError(e instanceof Error?e.message:"Impossibile duplicare il programma")}finally{setBusy(false)}}
  async function remove(){if(!program||!window.confirm(`Eliminare definitivamente “${program.name}”?`))return;setBusy(true);try{const r=await fetch(`/api/admin/workouts/${program.id}`,{method:"DELETE"});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||"Impossibile eliminare il programma");window.location.href="/admin/programs"}catch(e){setError(e instanceof Error?e.message:"Impossibile eliminare il programma")}finally{setBusy(false)}}
  if(loading)return <main className="min-h-screen bg-[var(--background)] p-8 text-[var(--foreground)]"><div className="mx-auto max-w-5xl">Caricamento programma…</div></main>;

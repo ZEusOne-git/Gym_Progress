@@ -75,15 +75,18 @@ export default function CalendarPage() {
   function onRailScroll() {
     const rail = railRef.current; if (!rail) return;
     requestAnimationFrame(() => {
+      const cards = Array.from(rail.querySelectorAll<HTMLElement>("[data-day]"));
       const center = rail.scrollLeft + rail.clientWidth / 2;
       let closest: { key: string; distance: number } | null = null;
-      rail.querySelectorAll<HTMLElement>("[data-day]").forEach(card => {
-        const key = card.dataset.day; if (!key) return;
+      for (const card of cards) {
+        const key = card.dataset.day;
+        if (!key) continue;
         const distance = Math.abs(center - (card.offsetLeft + card.clientWidth / 2));
         if (!closest || distance < closest.distance) closest = { key, distance };
-      });
+      }
       if (closest && closest.key !== selectedKey) {
-        const d = new Date(`${closest.key}T12:00:00`); if (!Number.isNaN(d.getTime())) setSelected(d);
+        const d = new Date(`${closest.key}T12:00:00`);
+        if (!Number.isNaN(d.getTime())) setSelected(d);
       }
     });
   }

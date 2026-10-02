@@ -26,6 +26,9 @@ export default function CalendarPage() {
   const [dragging, setDragging] = useState(false);
   const [animating, setAnimating] = useState(false);
   const pointerStart = useRef<number | null>(null);
+  const dragXRef = useRef(0);
+  const wheelDelta = useRef(0);
+  const wheelReset = useRef<number | null>(null);
   const carouselRef = useRef<HTMLDivElement | null>(null);
   const selectedKey = keyOf(selected);
   const today = new Date();
@@ -84,9 +87,28 @@ export default function CalendarPage() {
     if (!isToday && !animating) setSelected(new Date());
   }
 
+  function resetDrag() {
+    dragXRef.current = 0;
+    setDragX(0);
+  }
+
+  function animateDay(direction: 1 | -1) {
+    if (animating) return;
+    const width = carouselRef.current?.getBoundingClientRect().width ?? window.innerWidth;
+    setAnimating(true);
+    dragXRef.current = direction * -(width / 3);
+    setDragX(dragXRef.current);
+    window.setTimeout(() => {
+      setSelected(current => addDays(current, direction));
+      resetDrag();
+      setAnimating(false);
+    }, 460);
+  }
+
   function startPointer(clientX: number) {
     if (animating) return;
     pointerStart.current = clientX;
+    dragXRef.current = 0;
     setDragging(true);
     setDragX(0);
   }
@@ -94,45 +116,47 @@ export default function CalendarPage() {
   function movePointer(clientX: number) {
     if (pointerStart.current === null || animating) return;
     const delta = clientX - pointerStart.current;
-    setDragX(Math.max(-180, Math.min(180, delta)));
+    const next = Math.max(-180, Math.min(180, delta));
+    dragXRef.current = next;
+    setDragX(next);
   }
 
   function finishSwipe() {
     if (pointerStart.current === null || animating) return;
-    const delta = dragX;
+    const delta = dragXRef.current;
     pointerStart.current = null;
     setDragging(false);
     if (Math.abs(delta) < 48) {
-      setDragX(0);
+      resetDrag();
       return;
     }
-    const direction = delta < 0 ? 1 : -1;
-    const width = carouselRef.current?.getBoundingClientRect().width ?? window.innerWidth;
-    setAnimating(true);
-    setDragX(direction * -(width / 3));
-    window.setTimeout(() => {
-      setSelected(current => addDays(current, direction));
-      setDragX(0);
-      setAnimating(false);
-    }, 460);
+    animateDay(delta < 0 ? 1 : -1);
+  }
+
+  function handleWheel(event: React.WheelEvent<HTMLDivElement>) {
+    if (animating) {
+      event.preventDefault();
+      return;
+    }
+    const horizontal = Math.abs(event.deltaX) >= Math.abs(event.deltaY) ? event.deltaX : (event.shiftKey ? event.deltaY : 0);
+    if (Math.abs(horizontal) < 0.5) return;
+    event.preventDefault();
+    wheelDelta.current += horizontal;
+    if (wheelReset.current !== null) window.clearTimeout(wheelReset.current);
+    wheelReset.current = window.setTimeout(() => { wheelDelta.current = 0; }, 140);
+    if (Math.abs(wheelDelta.current) >= 70) {
+      const direction = wheelDelta.current > 0 ? 1 : -1;
+      wheelDelta.current = 0;
+      animateDay(direction);
+    }
   }
 
   function selectDay(day: Date) {
     if (dragging || animating) return;
     const diff = Math.round((day.getTime() - selected.getTime()) / 86400000);
     if (diff === 0) return;
-    if (Math.abs(diff) === 1) {
-      const width = carouselRef.current?.getBoundingClientRect().width ?? window.innerWidth;
-      setAnimating(true);
-      setDragX(-diff * (width / 3));
-      window.setTimeout(() => {
-        setSelected(day);
-        setDragX(0);
-        setAnimating(false);
-      }, 460);
-    } else {
-      setSelected(day);
-    }
+    if (Math.abs(diff) === 1) animateDay(diff > 0 ? 1 : -1);
+    else setSelected(day);
   }
 
   return <main className="min-h-[100dvh] bg-[var(--background)] pb-28">
@@ -157,7 +181,7 @@ export default function CalendarPage() {
           </div>
         </div>
 
-        <div ref={carouselRef} className="relative mt-7 overflow-hidden border-y border-[var(--border)] py-5 select-none touch-pan-y" onPointerDown={e => { if (e.pointerType === "mouse" && e.buttons !== 1) return; e.currentTarget.setPointerCapture(e.pointerId); startPointer(e.clientX); }} onPointerMove={e => movePointer(e.clientX)} onPointerUp={finishSwipe} onPointerCancel={finishSwipe}>
+        <div ref={carouselRef} className="relative mt-7 overflow-hidden border-y border-[var(--border)] py-5 select-none touch-pan-y overscroll-contain" onWheel={handleWheel} onPointerDown={e => { if (e.pointerType === "mouse" && e.buttons !== 1) return; e.currentTarget.setPointerCapture(e.pointerId); startPointer(e.clientX); }} onPointerMove={e => movePointer(e.clientX)} onPointerUp={finishSwipe} onPointerCancel={finishSwipe}>
           <div className="pointer-events-none absolute inset-y-0 left-1/3 z-0 w-1/3 bg-[var(--surface)]/20 blur-2xl" />
           <div className="relative z-10 flex h-[112px] w-full items-center will-change-transform" style={{ transform: `translate3d(${dragX}px,0,0)`, transition: dragging ? "none" : spring }}>
             {carouselDays.map((day, index) => {
@@ -173,7 +197,6 @@ export default function CalendarPage() {
               </button>;
             })}
           </div>
-          <p className="mt-2 text-center text-[9px] font-bold uppercase tracking-[0.18em] text-[var(--muted)]/70">Scorri</p>
         </div>
       </section>
 

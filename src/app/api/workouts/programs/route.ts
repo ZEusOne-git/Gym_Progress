@@ -56,6 +56,11 @@ function parseEquipment(value: string | null | undefined) {
   }
 }
 
+function isEquipmentCompatible(requirements: string[], available: string[]) {
+  if (requirements.length === 0 || requirements.some(token => token.toUpperCase() === "BODYWEIGHT")) return true;
+  return requirements.some(token => available.includes(EQUIPMENT_ALIASES[token.toUpperCase()] ?? token.toLowerCase()));
+}
+
 function planEquipmentFit(
   plan: { templates: { exercises: { exercise: { equipment: string } }[] }[] },
   available: string[],
@@ -64,12 +69,10 @@ function planEquipmentFit(
     template.exercises.map(item => parseEquipment(item.exercise.equipment)),
   );
   const relevant = requirements.filter(items => items.length > 0);
-  const compatible = relevant.filter(items =>
-    items.some(token => available.includes(EQUIPMENT_ALIASES[token.toUpperCase()] ?? token.toLowerCase())),
-  ).length;
+  const compatible = relevant.filter(items => isEquipmentCompatible(items, available)).length;
   const unsupported = [...new Set(
     relevant
-      .filter(items => !items.some(token => available.includes(EQUIPMENT_ALIASES[token.toUpperCase()] ?? token.toLowerCase())))
+      .filter(items => !isEquipmentCompatible(items, available))
       .flatMap(items => items.map(token => token.toLowerCase())),
   )];
 
@@ -80,6 +83,22 @@ function planEquipmentFit(
     unsupported,
     percent: relevant.length ? Math.round((compatible / relevant.length) * 100) : 100,
   };
+}
+
+function findAlternativeExercise(
+  source: { id: string; category: string; primaryMuscles: string; equipment: string; difficulty: string },
+  catalog: { id: string; category: string; primaryMuscles: string; equipment: string; difficulty: string }[],
+  available: string[],
+) {
+  return catalog.find(item =>
+    item.id !== source.id &&
+    item.category === source.category &&
+    isEquipmentCompatible(parseEquipment(item.equipment), available),
+  ) ?? catalog.find(item =>
+    item.id !== source.id &&
+    (item.primaryMuscles === source.primaryMuscles || item.category === source.category) &&
+    isEquipmentCompatible(parseEquipment(item.equipment), available),
+  );
 }
 
 export async function GET() {
@@ -133,11 +152,49 @@ export async function POST(request: Request) {
   const templatePlanId = typeof body.templatePlanId === "string" ? body.templatePlanId : "";
   if (!templatePlanId) return NextResponse.json({ error: "Seleziona un programma." }, { status: 400 });
 
-  const [profile, source] = await Promise.all([
+  const [profile, onboarding, source, catalog] = await Promise.all([
     prisma.profile.findUnique({ where: { userId: user.id }, select: { trainingDays: true } }),
-    prisma.workoutPlan.findFirst({ where: { id: templatePlanId, isTemplate: true, isActive: true }, include: { templates: { orderBy: { dayNumber: "asc" }, include: { exercises: { orderBy: { orderIndex: "asc" } } } } } }),
+    prisma.onboardingResponse.findUnique({ where: { userId: user.id }, select: { equipmentJson: true } }),
+    prisma.workoutPlan.findFirst({
+      where: { id: templatePlanId, isTemplate: true, isActive: true },
+      include: {
+        templates: {
+          orderBy: { dayNumber: "asc" },
+          include: {
+            exercises: {
+              orderBy: { orderIndex: "asc" },
+              include: { exercise: { select: { id: true, category: true, primaryMuscles: true, equipment: true, difficulty: true } } },
+            },
+          },
+        },
+      },
+    }),
+    prisma.exercise.findMany({
+      where: { isActive: true },
+      select: { id: true, category: true, primaryMuscles: true, equipment: true, difficulty: true },
+    }),
   ]);
   if (!source) return NextResponse.json({ error: "Programma consigliato non disponibile." }, { status: 404 });
+
+  const available = parseEquipment(onboarding?.equipmentJson);
+  const adaptations: { from: string; to: string }[] = [];
+  const resolvedExercises = new Map<string, string>();
+  for (const template of source.templates) {
+    for (const item of template.exercises) {
+      const requirements = parseEquipment(item.exercise.equipment);
+      if (isEquipmentCompatible(requirements, available)) {
+        resolvedExercises.set(item.id, item.exercise.id);
+        continue;
+      }
+      const alternative = findAlternativeExercise(item.exercise, catalog, available);
+      if (alternative) {
+        resolvedExercises.set(item.id, alternative.id);
+        adaptations.push({ from: item.exercise.id, to: alternative.id });
+      } else {
+        resolvedExercises.set(item.id, item.exercise.id);
+      }
+    }
+  }
 
   const count = Math.max(1, Math.min(source.templates.length, 7));
   const weekdays = weekdaysFor(profile?.trainingDays === count ? count : count);
@@ -158,7 +215,27 @@ export async function POST(request: Request) {
             dayNumber: day.dayNumber,
             name: day.name,
             estimatedMins: day.estimatedMins,
-            exercises: { create: day.exercises.map(ex => ({ exerciseId: ex.exerciseId, orderIndex: ex.orderIndex, sets: ex.sets, repMin: ex.repMin, repMax: ex.repMax, rirTarget: ex.rirTarget, restSeconds: ex.restSeconds, setType: ex.setType, progressionType: ex.progressionType, loadIncrement: ex.loadIncrement, tempo: ex.tempo, targetWeight: ex.targetWeight, notes: ex.notes })) },
+            exercises: {
+              create: day.exercises.map(ex => {
+                const exerciseId = resolvedExercises.get(ex.id) ?? ex.exerciseId;
+                const adapted = exerciseId !== ex.exerciseId;
+                return {
+                  exerciseId,
+                  orderIndex: ex.orderIndex,
+                  sets: ex.sets,
+                  repMin: ex.repMin,
+                  repMax: ex.repMax,
+                  rirTarget: ex.rirTarget,
+                  restSeconds: ex.restSeconds,
+                  setType: ex.setType,
+                  progressionType: ex.progressionType,
+                  loadIncrement: adapted ? null : ex.loadIncrement,
+                  tempo: ex.tempo,
+                  targetWeight: adapted ? null : ex.targetWeight,
+                  notes: adapted ? "Esercizio adattato all'attrezzatura disponibile." : ex.notes,
+                };
+              }),
+            },
           })),
         },
       },
@@ -177,5 +254,12 @@ export async function POST(request: Request) {
     return plan;
   });
 
-  return NextResponse.json({ plan: result, recurrence: { weeks: 12, weekdays } }, { status: 201 });
+  return NextResponse.json({
+    plan: result,
+    recurrence: { weeks: 12, weekdays },
+    adapted: {
+      count: adaptations.length,
+      applied: adaptations.length > 0,
+    },
+  }, { status: 201 });
 }

@@ -46,7 +46,7 @@ export async function GET(request: Request) {
         scheduledDate: true,
         templateId: true,
         template: { select: { id: true, dayNumber: true, name: true, estimatedMins: true, exercises: { orderBy: { orderIndex: "asc" }, select: { id: true, sets: true, repMin: true, repMax: true, exercise: { select: { name: true } } } } } },
-        session: { select: { id: true, startedAt: true, completedAt: true } },
+        session: { select: { id: true, startedAt: true, pausedAt: true, elapsedSeconds: true, completedAt: true } },
       },
     }),
     prisma.workoutSession.findMany({

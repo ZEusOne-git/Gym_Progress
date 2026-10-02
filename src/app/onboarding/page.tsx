@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { ArrowLeft, ArrowRight, Check, Dumbbell, Target, UserRound, CalendarDays, HeartPulse, Ruler, Sparkles } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
@@ -43,8 +42,7 @@ type FormState = {
 const emptyForm: FormState = { name: "", age: "", sex: "", weight: "", height: "", goal: "", experience: "", days: "4", priorities: [], running: "", notes: "" };
 
 export default function OnboardingPage() {
-  const searchParams = useSearchParams();
-  const editing = searchParams.get("edit") === "1";
+  const [editing, setEditing] = useState(false);
   const [step, setStep] = useState(0);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [loading, setLoading] = useState(true);
@@ -54,6 +52,8 @@ export default function OnboardingPage() {
   const StepIcon = steps[step].icon;
 
   useEffect(() => {
+    const editingMode = new URLSearchParams(window.location.search).get("edit") === "1";
+    setEditing(editingMode);
     let active = true;
     fetch("/api/onboarding", { cache: "no-store" })
       .then(async (response) => {
@@ -66,7 +66,7 @@ export default function OnboardingPage() {
       })
       .then((data) => {
         if (!active || !data) return;
-        if (data.completed && !editing) {
+        if (data.completed && !editingMode) {
           window.location.href = "/dashboard";
           return;
         }

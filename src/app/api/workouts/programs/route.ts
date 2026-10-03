@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 import { findAlternativeExercise, isEquipmentCompatible, parseEquipment } from "@/lib/equipment";
 import { FREE_EXERCISE_SET } from "@/lib/program-generator/free-exercise-catalog";
 import type { Prisma } from "@prisma/client";
@@ -28,7 +29,7 @@ function planEquipmentFit(plan: { templates: { exercises: { exercise: { equipmen
   return { available, total: requirements.length, compatible, unsupported, percent: requirements.length ? Math.round((compatible / requirements.length) * 100) : 100 };
 }
 
-const freeExerciseWhere = { exercise: { slug: { in: [...FREE_EXERCISE_SET] } } } as const;
+const freeExerciseWhere = { exercise: { is: { slug: { in: [...FREE_EXERCISE_SET] } } } } satisfies Prisma.WorkoutExerciseWhereInput;
 
 const generatedTemplateSelect = {
   id: true,

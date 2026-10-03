@@ -52,7 +52,7 @@ The local SQLite file is `prisma/dev.db` and is ignored by Git. The SQL migratio
 
 `db:seed` imports the RepDB free-tier exercise catalog and its static WebP pose illustrations for use inside this app. It requires network access during seeding. RepDB requires visible attribution. The free dataset does not include production-licensed animated GIFs; its paid-tier preview animations must not be used in production.
 
-The seed also creates five initial workout programs as unpublished drafts. Review their exercises and equipment fit in `/admin/programs`, then publish only the programs approved for athletes.
+The seed also creates seven initial workout programs as unpublished drafts, covering 2, 3, 4, 5, and 6 days per week. Review their exercises and equipment fit in `/admin/programs`, then publish only the programs approved for athletes.
 
 ## Environment
 

@@ -1,40 +1,54 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import ExercisePlayer from "@/components/workout/ExercisePlayer";
+import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 type PageProps = { params: Promise<{ exercise: string }> };
 
-const workoutSequence = [
-  { slug: "barbell-squat", name: "Barbell squat" },
-  { slug: "lat-pulldown", name: "Lat pulldown" },
-  { slug: "shoulder-press", name: "Shoulder press" },
-  { slug: "cable-curl", name: "Cable curl" },
-  { slug: "core-finisher", name: "Core finisher" },
-];
-
 export default async function ExercisePage({ params }: PageProps) {
   const { exercise: slug } = await params;
+  const user = await getCurrentUser();
+  if (!user) redirect(`/login?next=/workout/${slug}`);
 
-  const exercise = await prisma.exercise.findFirst({
-    where: { slug, isActive: true },
-    include: {
-      media: {
-        where: { isActive: true },
-        orderBy: [{ isPrimary: "desc" }, { createdAt: "desc" }],
+  const [exercise, plan] = await Promise.all([
+    prisma.exercise.findFirst({
+      where: { slug, isActive: true },
+      include: {
+        media: {
+          where: { isActive: true },
+          orderBy: [{ isPrimary: "desc" }, { createdAt: "desc" }],
+        },
       },
-    },
-  });
+    }),
+    prisma.workoutPlan.findFirst({
+      where: { userId: user.id, isActive: true, isTemplate: false },
+      orderBy: { updatedAt: "desc" },
+      select: {
+        templates: {
+          orderBy: { dayNumber: "asc" },
+          select: {
+            exercises: {
+              orderBy: { orderIndex: "asc" },
+              select: { exercise: { select: { slug: true, name: true } } },
+            },
+          },
+        },
+      },
+    }),
+  ]);
 
   if (!exercise) notFound();
 
-  const index = workoutSequence.findIndex(item => item.slug === slug);
+  const sequence = plan?.templates.flatMap(template => template.exercises.map(item => item.exercise)) ?? [];
+  const uniqueSequence = sequence.filter((item, index, items) => items.findIndex(candidate => candidate.slug === item.slug) === index);
+  const index = uniqueSequence.findIndex(item => item.slug === slug);
   const exerciseIndex = index >= 0 ? index : 0;
-  const nextExercise = index >= 0 ? workoutSequence[index + 1] ?? null : null;
+  const nextExercise = index >= 0 ? uniqueSequence[index + 1] ?? null : null;
 
   return (
     <ExercisePlayer
       exerciseIndex={exerciseIndex}
-      totalExercises={workoutSequence.length}
+      totalExercises={Math.max(uniqueSequence.length, 1)}
       nextExercise={nextExercise}
       exercise={{
         name: exercise.name,

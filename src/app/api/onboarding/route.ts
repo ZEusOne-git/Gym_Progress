@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { generateAndAssignPlan } from "@/lib/program-generator";
 
 const GOAL_MAP: Record<string, "FAT_LOSS" | "MUSCLE_GAIN" | "RECOMPOSITION" | "STRENGTH"> = {
   "RECOMP": "RECOMPOSITION",
@@ -55,6 +56,14 @@ export async function PUT(request: Request) {
   }
 
   const form = body as Record<string, unknown>;
+  const completing = form.completed === true;
+  if (completing) {
+    const activeSession = await prisma.workoutSession.findFirst({ where: { userId: user.id, completedAt: null }, select: { id: true } });
+    if (activeSession) {
+      return NextResponse.json({ error: "Termina o interrompi l'allenamento in corso prima di modificare il programma." }, { status: 409 });
+    }
+  }
+
   const firstName = typeof form.name === "string" ? form.name.trim() : undefined;
   const age = numberOrNull(form.age);
   const heightCm = numberOrNull(form.height);
@@ -99,7 +108,7 @@ export async function PUT(request: Request) {
       preferencesJson: JSON.stringify({ cardio: form.running ?? null, trainingStyle: form.notes ?? null }),
       limitationsJson: JSON.stringify({}),
       musclePrioritiesJson: JSON.stringify(priorities.map((item) => MUSCLE_MAP[item] ?? item)),
-      ...(form.completed === true ? { completedAt: new Date() } : {}),
+      ...(completing ? { completedAt: new Date() } : {}),
     },
     create: {
       userId: user.id,
@@ -109,9 +118,16 @@ export async function PUT(request: Request) {
       preferencesJson: JSON.stringify({ cardio: form.running ?? null, trainingStyle: form.notes ?? null }),
       limitationsJson: JSON.stringify({}),
       musclePrioritiesJson: JSON.stringify(priorities.map((item) => MUSCLE_MAP[item] ?? item)),
-      completedAt: form.completed === true ? new Date() : null,
+      completedAt: completing ? new Date() : null,
     },
   });
 
-  return NextResponse.json({ profile, onboarding, completed: Boolean(onboarding.completedAt) });
+  const plan = completing ? await generateAndAssignPlan(user.id) : null;
+
+  return NextResponse.json({
+    profile,
+    onboarding,
+    completed: Boolean(onboarding.completedAt),
+    plan,
+  });
 }

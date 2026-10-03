@@ -92,14 +92,17 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
   main.min-h-screen input { min-height: 48px; }
 
   /* Active workout: the animation gets a dedicated visual area and the control card becomes a compact lower sheet. */
-  main[class*="h-[100dvh]"] > div:nth-child(2) > div.mt-auto { max-height: 42dvh; overflow-y: auto; overscroll-behavior: contain; }
+  main[class*="h-[100dvh]"] > div:nth-child(2) > div.mt-auto { max-height: 40dvh; overflow-y: auto; overscroll-behavior: contain; }
   main[class*="h-[100dvh]"] > div:nth-child(2) > div.mt-auto > div { background: rgba(0, 0, 0, .72); }
   main[class*="h-[100dvh]"] > div:first-child > div:nth-child(2) { background: linear-gradient(to bottom, rgba(0,0,0,.28), rgba(0,0,0,.04) 45%, rgba(0,0,0,.58)) !important; }
   main[class*="h-[100dvh]"] > div:first-child img { max-height: 100%; }
+
+  /* The selected workout is already loaded when its animation is present; discard the stale initial selection alert. */
+  main[class*="h-[100dvh]"]:has(img[src^="/animations/"]) p[class*="border-red-300"] { display: none !important; }
 }
 
 @media (max-width: 639px) and (min-height: 780px) {
-  main[class*="h-[100dvh]"] > div:nth-child(2) > div.mt-auto { max-height: 40dvh; }
+  main[class*="h-[100dvh]"] > div:nth-child(2) > div.mt-auto { max-height: 38dvh; }
 }
 
 @media (max-height: 740px) and (max-width: 639px) {

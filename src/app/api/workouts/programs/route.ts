@@ -4,15 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { findAlternativeExercise, isEquipmentCompatible, parseEquipment } from "@/lib/equipment";
 
 function weekdaysFor(count: number) {
-  const presets: Record<number, number[]> = {
-    1: [1],
-    2: [1, 5],
-    3: [1, 3, 5],
-    4: [1, 3, 5, 7],
-    5: [1, 2, 4, 5, 7],
-    6: [1, 2, 3, 4, 5, 7],
-    7: [1, 2, 3, 4, 5, 6, 7],
-  };
+  const presets: Record<number, number[]> = { 1: [1], 2: [1, 5], 3: [1, 3, 5], 4: [1, 3, 5, 7], 5: [1, 2, 4, 5, 7], 6: [1, 2, 3, 4, 5, 7], 7: [1, 2, 3, 4, 5, 6, 7] };
   return (presets[Math.max(1, Math.min(count, 7))] ?? presets[4]).slice(0, count);
 }
 
@@ -26,28 +18,11 @@ function nextMonday() {
   return { today: date, monday };
 }
 
-function planEquipmentFit(
-  plan: { templates: { exercises: { exercise: { equipment: string } }[] }[] },
-  available: string[],
-) {
-  const requirements = plan.templates.flatMap(template =>
-    template.exercises.map(item => parseEquipment(item.exercise.equipment)),
-  );
-  const relevant = requirements.filter(items => items.length > 0);
-  const compatible = relevant.filter(items => isEquipmentCompatible(items, available)).length;
-  const unsupported = [...new Set(
-    relevant
-      .filter(items => !isEquipmentCompatible(items, available))
-      .flatMap(items => items.map(token => token.toLowerCase())),
-  )];
-
-  return {
-    available,
-    total: relevant.length,
-    compatible,
-    unsupported,
-    percent: relevant.length ? Math.round((compatible / relevant.length) * 100) : 100,
-  };
+function planEquipmentFit(plan: { templates: { exercises: { exercise: { equipment: string } }[] }[] }, available: string[]) {
+  const requirements = plan.templates.flatMap(template => template.exercises.map(item => parseEquipment(item.exercise.equipment))).filter(items => items.length > 0);
+  const compatible = requirements.filter(items => isEquipmentCompatible(items, available)).length;
+  const unsupported = [...new Set(requirements.filter(items => !isEquipmentCompatible(items, available)).flatMap(items => items.map(token => token.toLowerCase())))];
+  return { available, total: requirements.length, compatible, unsupported, percent: requirements.length ? Math.round((compatible / requirements.length) * 100) : 100 };
 }
 
 export async function GET() {
@@ -60,40 +35,18 @@ export async function GET() {
     prisma.workoutPlan.findMany({
       where: { isTemplate: true, isActive: true, OR: [{ userId: null }, { userId: user.id }] },
       orderBy: { updatedAt: "desc" },
-      select: {
-        id: true,
-        name: true,
-        templates: {
-          orderBy: { dayNumber: "asc" },
-          select: {
-            id: true,
-            dayNumber: true,
-            name: true,
-            estimatedMins: true,
-            _count: { select: { exercises: true } },
-            exercises: {
-              select: { exercise: { select: { equipment: true } } },
-            },
-          },
-        },
-      },
+      select: { id: true, name: true, templates: { orderBy: { dayNumber: "asc" }, select: { id: true, dayNumber: true, name: true, estimatedMins: true, _count: { select: { exercises: true } }, exercises: { select: { exercise: { select: { equipment: true } } } } } } },
     }),
     prisma.workoutPlan.findFirst({
       where: { userId: user.id, isActive: true, isTemplate: false },
-      select: { id: true, name: true },
+      orderBy: { updatedAt: "desc" },
+      select: { id: true, name: true, templates: { orderBy: { dayNumber: "asc" }, select: { id: true, dayNumber: true, name: true, estimatedMins: true, _count: { select: { exercises: true } } } } },
     }),
   ]);
 
   const available = parseEquipment(onboarding?.equipmentJson);
-  const enrichedPlans = plans.map(plan => ({
-    id: plan.id,
-    name: plan.name,
-    templates: plan.templates,
-    equipmentFit: planEquipmentFit(plan, available),
-    trainingDaysFit: profile?.trainingDays == null || profile.trainingDays === plan.templates.length,
-  }));
-
-  return NextResponse.json({ plans: enrichedPlans, current, equipment: available, preferredTrainingDays: profile?.trainingDays ?? null });
+  const enrichedPlans = plans.map(plan => ({ id: plan.id, name: plan.name, templates: plan.templates, equipmentFit: planEquipmentFit(plan, available), trainingDaysFit: profile?.trainingDays == null || profile.trainingDays === plan.templates.length }));
+  return NextResponse.json({ plans: enrichedPlans, current: current ? { id: current.id, name: current.name } : null, currentPlan: current, equipment: available, preferredTrainingDays: profile?.trainingDays ?? null });
 }
 
 export async function POST(request: Request) {
@@ -105,24 +58,8 @@ export async function POST(request: Request) {
 
   const [onboarding, source, catalog] = await Promise.all([
     prisma.onboardingResponse.findUnique({ where: { userId: user.id }, select: { equipmentJson: true } }),
-    prisma.workoutPlan.findFirst({
-      where: { id: templatePlanId, isTemplate: true, isActive: true, OR: [{ userId: null }, { userId: user.id }] },
-      include: {
-        templates: {
-          orderBy: { dayNumber: "asc" },
-          include: {
-            exercises: {
-              orderBy: { orderIndex: "asc" },
-              include: { exercise: { select: { id: true, name: true, category: true, primaryMuscles: true, equipment: true, difficulty: true, isActive: true } } },
-            },
-          },
-        },
-      },
-    }),
-    prisma.exercise.findMany({
-      where: { isActive: true },
-      select: { id: true, category: true, primaryMuscles: true, equipment: true, difficulty: true },
-    }),
+    prisma.workoutPlan.findFirst({ where: { id: templatePlanId, isTemplate: true, isActive: true, OR: [{ userId: null }, { userId: user.id }] }, include: { templates: { orderBy: { dayNumber: "asc" }, include: { exercises: { orderBy: { orderIndex: "asc" }, include: { exercise: { select: { id: true, name: true, category: true, primaryMuscles: true, equipment: true, difficulty: true, isActive: true } } } } } } } }),
+    prisma.exercise.findMany({ where: { isActive: true }, select: { id: true, category: true, primaryMuscles: true, equipment: true, difficulty: true } }),
   ]);
   if (!source) return NextResponse.json({ error: "Programma consigliato non disponibile." }, { status: 404 });
 
@@ -130,100 +67,30 @@ export async function POST(request: Request) {
   const adaptations: { from: string; to: string }[] = [];
   const resolvedExercises = new Map<string, string>();
   const incompatible: string[] = [];
-  for (const template of source.templates) {
-    for (const item of template.exercises) {
-      if (!item.exercise.isActive) {
-        incompatible.push(item.exercise.name);
-        continue;
-      }
-      const requirements = parseEquipment(item.exercise.equipment);
-      if (isEquipmentCompatible(requirements, available)) {
-        resolvedExercises.set(item.id, item.exercise.id);
-        continue;
-      }
-      const alternative = findAlternativeExercise(item.exercise, catalog, available);
-      if (alternative) {
-        resolvedExercises.set(item.id, alternative.id);
-        adaptations.push({ from: item.exercise.id, to: alternative.id });
-      } else {
-        incompatible.push(item.exercise.name);
-      }
-    }
+  for (const template of source.templates) for (const item of template.exercises) {
+    if (!item.exercise.isActive) { incompatible.push(item.exercise.name); continue; }
+    const requirements = parseEquipment(item.exercise.equipment);
+    if (isEquipmentCompatible(requirements, available)) { resolvedExercises.set(item.id, item.exercise.id); continue; }
+    const alternative = findAlternativeExercise(item.exercise, catalog, available);
+    if (alternative) { resolvedExercises.set(item.id, alternative.id); adaptations.push({ from: item.exercise.id, to: alternative.id }); } else incompatible.push(item.exercise.name);
   }
-  if (incompatible.length) {
-    return NextResponse.json({ error: `Non è possibile assegnare questo programma con l'attrezzatura disponibile. Esercizi da correggere: ${[...new Set(incompatible)].join(", ")}.` }, { status: 409 });
-  }
+  if (incompatible.length) return NextResponse.json({ error: `Non è possibile assegnare questo programma con l'attrezzatura disponibile. Esercizi da correggere: ${[...new Set(incompatible)].join(", ")}.` }, { status: 409 });
 
   const count = Math.max(1, Math.min(source.templates.length, 7));
   const weekdays = weekdaysFor(count);
   const { today, monday } = nextMonday();
-
   const result = await prisma.$transaction(async tx => {
     const openSession = await tx.workoutSession.findFirst({ where: { userId: user.id, completedAt: null }, select: { id: true } });
     if (openSession) return null;
-
     await tx.workoutSchedule.deleteMany({ where: { userId: user.id, scheduledDate: { gte: today }, session: { is: null } } });
     await tx.workoutSchedule.deleteMany({ where: { userId: user.id, scheduledDate: { gte: monday }, session: { is: { completedAt: { not: null } } } } });
     await tx.workoutPlan.updateMany({ where: { userId: user.id, isActive: true, isTemplate: false }, data: { isActive: false } });
-    const plan = await tx.workoutPlan.create({
-      data: {
-        userId: user.id,
-        name: source.name,
-        version: source.version,
-        isActive: true,
-        isTemplate: false,
-        templates: {
-          create: source.templates.map(day => ({
-            dayNumber: day.dayNumber,
-            name: day.name,
-            estimatedMins: day.estimatedMins,
-            exercises: {
-              create: day.exercises.map(ex => {
-                const exerciseId = resolvedExercises.get(ex.id) ?? ex.exerciseId;
-                const adapted = exerciseId !== ex.exerciseId;
-                return {
-                  exerciseId,
-                  orderIndex: ex.orderIndex,
-                  sets: ex.sets,
-                  repMin: ex.repMin,
-                  repMax: ex.repMax,
-                  rirTarget: ex.rirTarget,
-                  restSeconds: ex.restSeconds,
-                  setType: ex.setType,
-                  progressionType: ex.progressionType,
-                  loadIncrement: adapted ? null : ex.loadIncrement,
-                  tempo: ex.tempo,
-                  targetWeight: adapted ? null : ex.targetWeight,
-                  notes: adapted ? "Esercizio adattato all'attrezzatura disponibile." : ex.notes,
-                };
-              }),
-            },
-          })),
-        },
-      },
-      include: { templates: { orderBy: { dayNumber: "asc" } } },
-    });
+    const plan = await tx.workoutPlan.create({ data: { userId: user.id, name: source.name, version: source.version, isActive: true, isTemplate: false, templates: { create: source.templates.map(day => ({ dayNumber: day.dayNumber, name: day.name, estimatedMins: day.estimatedMins, exercises: { create: day.exercises.map(ex => { const exerciseId = resolvedExercises.get(ex.id) ?? ex.exerciseId; const adapted = exerciseId !== ex.exerciseId; return { exerciseId, orderIndex: ex.orderIndex, sets: ex.sets, repMin: ex.repMin, repMax: ex.repMax, rirTarget: ex.rirTarget, restSeconds: ex.restSeconds, setType: ex.setType, progressionType: ex.progressionType, loadIncrement: adapted ? null : ex.loadIncrement, tempo: ex.tempo, targetWeight: adapted ? null : ex.targetWeight, notes: adapted ? "Esercizio adattato all'attrezzatura disponibile." : ex.notes }; }) } })) } }, include: { templates: { orderBy: { dayNumber: "asc" } } } });
     const schedules: { userId: string; workoutPlanId: string; templateId: string; scheduledDate: Date }[] = [];
-    for (let week = 0; week < 12; week++) {
-      for (let index = 0; index < plan.templates.length; index++) {
-        const scheduledDate = new Date(monday);
-        scheduledDate.setDate(monday.getDate() + week * 7 + (weekdays[index] - 1));
-        scheduledDate.setHours(12, 0, 0, 0);
-        schedules.push({ userId: user.id, workoutPlanId: plan.id, templateId: plan.templates[index].id, scheduledDate });
-      }
-    }
+    for (let week = 0; week < 12; week++) for (let index = 0; index < plan.templates.length; index++) { const scheduledDate = new Date(monday); scheduledDate.setDate(monday.getDate() + week * 7 + (weekdays[index] - 1)); scheduledDate.setHours(12, 0, 0, 0); schedules.push({ userId: user.id, workoutPlanId: plan.id, templateId: plan.templates[index].id, scheduledDate }); }
     await tx.workoutSchedule.createMany({ data: schedules });
     return plan;
   });
-
   if (!result) return NextResponse.json({ error: "Riprendi e completa o termina l'allenamento in corso prima di cambiare programma." }, { status: 409 });
-
-  return NextResponse.json({
-    plan: result,
-    recurrence: { weeks: 12, weekdays },
-    adapted: {
-      count: adaptations.length,
-      applied: adaptations.length > 0,
-    },
-  }, { status: 201 });
+  return NextResponse.json({ plan: result, recurrence: { weeks: 12, weekdays }, adapted: { count: adaptations.length, applied: adaptations.length > 0 } }, { status: 201 });
 }

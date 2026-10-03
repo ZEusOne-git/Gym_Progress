@@ -41,7 +41,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   if (!template) return NextResponse.json({ error: "Workout non trovato." }, { status: 404 });
 
   const invalid = await prisma.workoutTemplateExercise.findFirst({
-    where: { workoutTemplateId: template.id, exercise: { slug: { notIn: [...FREE_EXERCISE_SET] } } },
+    where: { templateId: template.id, exercise: { slug: { notIn: [...FREE_EXERCISE_SET] } } },
     select: { exercise: { select: { name: true } } },
   });
   if (invalid) return NextResponse.json({ error: "Questo workout contiene ancora esercizi fuori dal catalogo free. Esegui la migrazione dei programmi prima di allenarti." }, { status: 409 });

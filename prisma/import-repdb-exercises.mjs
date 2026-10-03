@@ -37,7 +37,8 @@ async function main() {
     const difficulty = ["BEGINNER", "INTERMEDIATE", "ADVANCED"].includes(String(item.difficulty).toUpperCase())
       ? String(item.difficulty).toUpperCase()
       : "BEGINNER";
-    const primaryMuscles = list(item.primary_muscles).map(slugify).join(" · ") || String(item.body_part ?? "GENERAL");
+    const primaryMuscles = list(item.primary_muscles).map(slugify);
+    if (!primaryMuscles.length && item.body_part) primaryMuscles.push(slugify(String(item.body_part)));
 
     const exercise = await prisma.exercise.upsert({
       where: { slug: localSlugAliases[item.id] ?? item.id },
@@ -47,7 +48,7 @@ async function main() {
         name: item.name_en,
         slug: localSlugAliases[item.id] ?? item.id,
         category: String(item.category ?? "STRENGTH").toUpperCase(),
-        primaryMuscles,
+        primaryMuscles: JSON.stringify(primaryMuscles),
         secondaryMuscles: JSON.stringify(list(item.secondary_muscles).map(slugify)),
         equipment: JSON.stringify(equipment),
         difficulty,

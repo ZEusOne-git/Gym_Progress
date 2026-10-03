@@ -23,6 +23,7 @@ export type PlanPreferences = {
   goal: TrainingGoal
   equipment: Equipment[]
   priorities?: MusclePriority[]
+  sessionMinutes?: number
 }
 
 export type ExerciseCandidate = {

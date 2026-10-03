@@ -17,13 +17,28 @@ const steps = [
 ];
 
 const goals = [
-  ["RECOMP", "Perdere grasso e costruire muscolo"],
-  ["FAT LOSS", "Ridurre il grasso mantenendo la forza"],
-  ["MUSCLE", "Aumentare massa e muscoli"],
-  ["STRENGTH", "Diventare più forte negli esercizi principali"],
+  { value: "RECOMP", label: "Ricomposizione", description: "Perdere grasso e costruire muscolo" },
+  { value: "FAT LOSS", label: "Perdita di grasso", description: "Ridurre il grasso mantenendo la forza" },
+  { value: "MUSCLE", label: "Aumento della massa", description: "Aumentare massa e muscoli" },
+  { value: "STRENGTH", label: "Forza", description: "Diventare più forte negli esercizi principali" },
 ];
 
-const priorities = ["Arms", "Shoulders", "Chest", "Back", "Abs", "Glutes", "Quads", "Hamstrings", "Calves", "Lower back"];
+const priorities = [
+  { value: "Arms", label: "Braccia" },
+  { value: "Shoulders", label: "Spalle" },
+  { value: "Chest", label: "Petto" },
+  { value: "Back", label: "Schiena" },
+  { value: "Abs", label: "Addome" },
+  { value: "Glutes", label: "Glutei" },
+  { value: "Quads", label: "Quadricipiti" },
+  { value: "Hamstrings", label: "Femorali" },
+  { value: "Calves", label: "Polpacci" },
+  { value: "Lower back", label: "Zona lombare" },
+];
+const priorityValueByStoredValue: Record<string, string> = Object.fromEntries(
+  priorities.flatMap(({ value }) => [[value.toUpperCase(), value], [value.replaceAll(" ", "_").toUpperCase(), value]])
+);
+priorityValueByStoredValue.LOWER_BACK = "Lower back";
 const equipmentOptions = [
   { id: "machines", label: "Macchine e cavi" },
   { id: "barbells", label: "Bilancieri" },
@@ -68,7 +83,7 @@ export default function OnboardingPage() {
           window.location.href = "/login?next=/onboarding";
           return null;
         }
-        if (!response.ok) throw new Error("Unable to load your profile.");
+        if (!response.ok) throw new Error("Impossibile caricare il profilo.");
         return response.json();
       })
       .then((data) => {
@@ -82,7 +97,13 @@ export default function OnboardingPage() {
         let prioritiesFromDb: string[] = [];
         try {
           const stored = JSON.parse(onboarding.musclePrioritiesJson ?? "[]");
-          prioritiesFromDb = Array.isArray(stored) ? stored.map((item: string) => item.replace("LOWER_BACK", "Lower back").replace("SHOULDERS", "Shoulders").replace("CHEST", "Chest").replace("BACK", "Back").replace("ABS", "Abs").replace("GLUTES", "Glutes").replace("QUADS", "Quads").replace("HAMSTRINGS", "Hamstrings").replace("CALVES", "Calves")) : [];
+          prioritiesFromDb = Array.isArray(stored)
+            ? stored.flatMap((item: unknown) => {
+                if (typeof item !== "string") return [];
+                const value = priorityValueByStoredValue[item.toUpperCase()];
+                return value ? [value] : [];
+              })
+            : [];
         } catch { prioritiesFromDb = []; }
         let preferences: { cardio?: string; trainingStyle?: string } = {};
         try { preferences = JSON.parse(onboarding.preferencesJson ?? "{}"); } catch { preferences = {}; }
@@ -102,13 +123,13 @@ export default function OnboardingPage() {
           goal: goalReverse[onboarding.primaryGoal] ?? "",
           experience: profile.experience ?? "",
           days: profile.trainingDays?.toString() ?? "4",
-          priorities: prioritiesFromDb.filter((item) => priorities.includes(item)),
+          priorities: prioritiesFromDb.filter((item) => priorities.some((priority) => priority.value === item)),
           equipment,
           running: preferences.cardio ?? "",
           notes: preferences.trainingStyle ?? "",
         });
       })
-      .catch((cause) => { if (active) setError(cause instanceof Error ? cause.message : "Unable to load your profile."); })
+      .catch((cause) => { if (active) setError(cause instanceof Error ? cause.message : "Impossibile caricare il profilo."); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, []);
@@ -123,12 +144,12 @@ export default function OnboardingPage() {
     try {
       const response = await fetch("/api/onboarding", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...form, completed }) });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error ?? "Unable to save your progress.");
+      if (!response.ok) throw new Error(data.error ?? "Impossibile salvare i progressi.");
       if (editing && completed) window.location.href = "/profile";
       else if (completed) window.location.href = "/programs";
       else setStep((current) => current + 1);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Unable to save your progress.");
+      setError(cause instanceof Error ? cause.message : "Impossibile salvare i progressi.");
     } finally {
       setSaving(false);
     }
@@ -158,10 +179,10 @@ export default function OnboardingPage() {
           <div className="mt-8 space-y-4">
             {step === 0 && <><Field label="Nome" value={form.name} onChange={(value) => update("name", value)} placeholder="Il tuo nome" /><Field label="Età" value={form.age} onChange={(value) => update("age", value)} placeholder="29" type="number" /></>}
             {step === 1 && <div className="grid grid-cols-2 gap-3"><Field label="Peso (kg)" value={form.weight} onChange={(value) => update("weight", value)} placeholder="90" type="number" /><Field label="Altezza (cm)" value={form.height} onChange={(value) => update("height", value)} placeholder="180" type="number" /></div>}
-            {step === 2 && <div className="space-y-3">{goals.map(([title, description]) => <button key={title} onClick={() => update("goal", title)} className={`w-full rounded-2xl border p-4 text-left transition ${form.goal === title ? "border-[var(--accent)] bg-[var(--accent)] text-[var(--accent-foreground)]" : "border-[var(--border)] bg-[var(--surface)]"}`}><span className="block font-black">{title}</span><span className={`mt-1 block text-sm ${form.goal === title ? "opacity-70" : "text-[var(--muted)]"}`}>{description}</span></button>)}</div>}
+            {step === 2 && <div className="space-y-3">{goals.map(({ value, label, description }) => <button key={value} onClick={() => update("goal", value)} className={`w-full rounded-2xl border p-4 text-left transition ${form.goal === value ? "border-[var(--accent)] bg-[var(--accent)] text-[var(--accent-foreground)]" : "border-[var(--border)] bg-[var(--surface)]"}`}><span className="block font-black">{label}</span><span className={`mt-1 block text-sm ${form.goal === value ? "opacity-70" : "text-[var(--muted)]"}`}>{description}</span></button>)}</div>}
             {step === 3 && <Choice label="Esperienza con i pesi" options={["Beginner", "Intermediate", "Advanced"]} value={form.experience} onChange={(value) => update("experience", value)} />}
             {step === 4 && <><Choice label="Giorni a settimana" options={["2", "3", "4", "5", "6"]} value={form.days} onChange={(value) => update("days", value)} /><Choice label="Attività cardio" options={["None", "1–2 sessions", "3+ sessions", "I want to add running"]} value={form.running} onChange={(value) => update("running", value)} /></>}
-            {step === 5 && <div className="grid grid-cols-2 gap-3">{priorities.map((item) => <button key={item} onClick={() => togglePriority(item)} className={`rounded-2xl border px-4 py-4 text-left text-sm font-bold transition ${form.priorities.includes(item) ? "border-[var(--accent)] bg-[var(--accent)] text-[var(--accent-foreground)]" : "border-[var(--border)] bg-[var(--surface)]"}`}><span className="mr-2 inline-flex h-5 w-5 items-center justify-center rounded-full border border-current">{form.priorities.includes(item) && <Check size={13} />}</span>{item}</button>)}</div>}
+            {step === 5 && <div className="grid grid-cols-2 gap-3">{priorities.map(({ value, label }) => <button key={value} onClick={() => togglePriority(value)} className={`rounded-2xl border px-4 py-4 text-left text-sm font-bold transition ${form.priorities.includes(value) ? "border-[var(--accent)] bg-[var(--accent)] text-[var(--accent-foreground)]" : "border-[var(--border)] bg-[var(--surface)]"}`}><span className="mr-2 inline-flex h-5 w-5 items-center justify-center rounded-full border border-current">{form.priorities.includes(value) && <Check size={13} />}</span>{label}</button>)}</div>}
             {step === 6 && <>
               <div>
                 <p className="mb-2 text-sm font-semibold">Attrezzatura che hai a disposizione</p>

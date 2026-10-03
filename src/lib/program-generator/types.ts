@@ -28,6 +28,7 @@ export type PlanPreferences = {
 
 export type ExerciseCandidate = {
   id: string
+  slug: string
   muscleGroups: MusclePriority[]
   equipment: string[]
   hasStaticMedia: boolean

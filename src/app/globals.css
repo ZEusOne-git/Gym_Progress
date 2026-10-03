@@ -68,7 +68,7 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
 [data-calendar-card] > div { transition: transform 420ms cubic-bezier(.22,1,.36,1), background-color 420ms ease, border-color 420ms ease, box-shadow 420ms ease, color 240ms ease; }
 [data-calendar-card]:not(:has(> div.border-[var\(--accent\)])):hover > div { transform: translateY(-2px); }
 
-/* Calendar rail: quiet, compact and touch-first. The selected day stays visually dominant. */
+/* Active workout: keep the animation visible instead of letting the exercise card cover the whole viewport. */
 @media (max-width: 639px) {
   html, body { width: 100%; overflow-x: hidden; }
   body { overscroll-behavior-x: none; }
@@ -78,7 +78,6 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
   [data-calendar-card]:has(> div.bg-\[var\(--accent\)]) > div { height: 104px !important; border-width: 0 !important; background: var(--accent) !important; box-shadow: 0 18px 40px color-mix(in srgb, var(--accent) 18%, transparent) !important; }
   [data-calendar-card] > div span:last-child { max-width: 76px; font-size: 8px; letter-spacing: .08em; }
 
-  /* The current calendar implementation uses a five-day rail. Keep it calm and legible. */
   div.touch-pan-y { touch-action: pan-x; overscroll-behavior-x: contain; border-color: color-mix(in srgb, var(--border) 70%, transparent); }
   div.touch-pan-y > div[class*="grid-cols-5"] { gap: 2px; transform-origin: center; }
   div.touch-pan-y > div[class*="grid-cols-5"] > button { min-width: 0; padding: 4px 0; transition: transform 360ms cubic-bezier(.22,1,.36,1), opacity 280ms ease; }
@@ -93,15 +92,25 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
   main.min-h-screen > div.min-h-screen > header + div { flex: 0 0 auto; }
   main.min-h-screen button { touch-action: manipulation; }
   main.min-h-screen input { min-height: 48px; }
+
+  /* New active-workout layout uses a full-viewport main rather than the older min-h-screen shell. */
+  main[class*="h-[100dvh]"] > div:nth-child(2) > div.mt-auto { max-height: 46dvh; overflow-y: auto; overscroll-behavior: contain; }
+  main[class*="h-[100dvh]"] > div:nth-child(2) > div.mt-auto > div { background: rgba(0, 0, 0, .68); }
+  main[class*="h-[100dvh]"] > div:first-child img { max-height: 100%; }
+}
+
+@media (max-width: 639px) and (min-height: 780px) {
+  main[class*="h-[100dvh]"] > div:nth-child(2) > div.mt-auto { max-height: 42dvh; }
 }
 
 @media (max-height: 740px) and (max-width: 639px) {
-  /* Short iPhones/Android devices: compress chrome before content, never the CTA. */
   main.min-h-screen > div.min-h-screen > header { padding-top: 10px !important; padding-bottom: 10px !important; }
   main.min-h-screen > div.min-h-screen > header + div { margin-bottom: 10px !important; }
   main.min-h-screen h1 { line-height: .95 !important; }
   main.min-h-screen h2 { line-height: 1 !important; }
   main.min-h-screen .min-h-14 { min-height: 52px !important; }
+
+  main[class*="h-[100dvh]"] > div:nth-child(2) > div.mt-auto { max-height: 50dvh; }
 }
 
 @media (prefers-reduced-motion: reduce) {

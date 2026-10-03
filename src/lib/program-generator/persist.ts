@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
 import { generatePlan } from "./generator";
 import { normalizePlanPreferences } from "./plan-profile";
+import { FREE_EXERCISE_SET } from "./free-exercise-catalog";
 import type { ExerciseCandidate, MusclePriority, PlanPreferences } from "./types";
 
 const parse = (value: string | null | undefined): string[] => {
@@ -42,10 +43,13 @@ export async function generateAndAssignPlan(userId: string) {
   const days = ([2, 3, 4, 5, 6] as const).includes(profile.trainingDays as 2 | 3 | 4 | 5 | 6) ? profile.trainingDays as PlanPreferences["trainingDays"] : 3;
   const preferences = normalizePlanPreferences({ trainingDays: days, experience: experience(profile.experience), goal: goal(onboarding.primaryGoal), equipment: parse(onboarding.equipmentJson), priorities: muscles(parse(onboarding.musclePrioritiesJson)), sessionMinutes: profile.sessionMinutes ?? undefined });
 
-  const rows = await prisma.exercise.findMany({ where: { isActive: true }, select: { id: true, primaryMuscles: true, secondaryMuscles: true, equipment: true, media: { where: { isActive: true }, select: { type: true } } } });
-  const candidates: ExerciseCandidate[] = rows.map((row) => ({ id: row.id, muscleGroups: muscles([...parse(row.primaryMuscles), ...parse(row.secondaryMuscles)]), equipment: parse(row.equipment), hasStaticMedia: row.media.some((m) => m.type === "IMAGE"), hasVideoMedia: row.media.some((m) => ["VIDEO", "WEBM", "GIF"].includes(m.type)), isActive: true }));
+  const rows = await prisma.exercise.findMany({
+    where: { isActive: true, slug: { in: [...FREE_EXERCISE_SET] } },
+    select: { id: true, slug: true, primaryMuscles: true, secondaryMuscles: true, equipment: true, media: { where: { isActive: true }, select: { type: true } } },
+  });
+  const candidates: ExerciseCandidate[] = rows.map((row) => ({ id: row.id, slug: row.slug, muscleGroups: muscles([...parse(row.primaryMuscles), ...parse(row.secondaryMuscles)]), equipment: parse(row.equipment), hasStaticMedia: row.media.some((m) => m.type === "IMAGE"), hasVideoMedia: row.media.some((m) => ["VIDEO", "WEBM", "GIF"].includes(m.type)), isActive: true }));
   const generated = generatePlan(preferences, candidates);
-  if (generated.days.some((day) => day.exercises.length < 3)) throw new Error("Non ci sono abbastanza esercizi compatibili.");
+  if (generated.days.some((day) => day.exercises.length < 3)) throw new Error("Non ci sono abbastanza esercizi compatibili nel catalogo free fornito.");
   const activeSession = await prisma.workoutSession.findFirst({ where: { userId, completedAt: null }, select: { id: true } });
   if (activeSession) throw new Error("Completa o termina l'allenamento attivo prima di cambiare programma.");
 
@@ -56,11 +60,6 @@ export async function generateAndAssignPlan(userId: string) {
     const activePlanIds = activePlans.map((plan) => plan.id);
     if (activePlanIds.length) {
       await tx.workoutPlan.updateMany({ where: { id: { in: activePlanIds } }, data: { isActive: false } });
-
-      // A regeneration owns the future calendar of the replaced plan. Detach
-      // any already-recorded session before deleting those occurrences so the
-      // new plan can reuse the dates without losing workout history or hitting
-      // the unique(userId, scheduledDate) constraint.
       const futureSchedules = await tx.workoutSchedule.findMany({
         where: { userId, workoutPlanId: { in: activePlanIds }, scheduledDate: { gte: today } },
         select: { id: true },

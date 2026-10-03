@@ -1,9 +1,17 @@
+import fs from "node:fs";
+import path from "node:path";
 import { PrismaClient } from "@prisma/client";
 import { FREE_EXERCISE_SET } from "./free-exercise-catalog.mjs";
 
 const prisma = new PrismaClient();
 
+function assertAnimationFiles() {
+  const missing = [...FREE_EXERCISE_SET].filter((slug) => !fs.existsSync(path.resolve(process.cwd(), "public", "animations", `${slug}.webp`)));
+  if (missing.length) throw new Error(`Animazioni free mancanti in public/animations: ${missing.join(", ")}`);
+}
+
 async function main() {
+  assertAnimationFiles();
   const free = await prisma.exercise.findMany({
     where: { isActive: true, slug: { in: [...FREE_EXERCISE_SET] } },
     select: { id: true, slug: true },
@@ -54,7 +62,7 @@ async function main() {
   }
   if (invalidAssignments.length) throw new Error(`Assegnazioni attive non free: ${invalidAssignments.join(", ")}`);
 
-  console.log(`OK: ${free.length} esercizi free, ${templates.length} template verificati, ${activeAssignments.length} piani utente verificati.`);
+  console.log(`OK: ${free.length} esercizi free con animazioni locali, ${templates.length} template verificati, ${activeAssignments.length} piani utente verificati.`);
 }
 
 main().catch((error) => {

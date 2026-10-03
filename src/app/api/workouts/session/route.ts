@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { generateAndAssignPlan } from "@/lib/program-generator/persist";
 
 function parseDate(value: unknown) {
   if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
@@ -8,6 +9,18 @@ function parseDate(value: unknown) {
   const date = new Date(y, m - 1, d);
   if (date.getFullYear() !== y || date.getMonth() !== m - 1 || date.getDate() !== d) return null;
   return date;
+}
+
+async function refreshPlanAfterSession(userId: string) {
+  try {
+    await generateAndAssignPlan(userId);
+    return true;
+  } catch (error) {
+    // Completing an already-finished workout must never fail because the
+    // replacement plan cannot currently be generated.
+    console.error("[workouts/session] deferred plan regeneration", error);
+    return false;
+  }
 }
 
 export async function GET(request: Request) {
@@ -107,7 +120,8 @@ export async function PATCH(request: Request) {
       const now = new Date();
       const additionalSeconds = Math.max(0, Math.floor((now.getTime() - session.startedAt.getTime()) / 1000));
       const finished = await prisma.workoutSession.update({ where: { id: sessionId }, data: { completedAt: now, endedEarly: true, elapsedSeconds: { increment: additionalSeconds } }, select: { id: true, completedAt: true, endedEarly: true, elapsedSeconds: true } });
-      return NextResponse.json({ ok: true, finishedEarly: true, session: finished });
+      const planRegenerated = await refreshPlanAfterSession(user.id);
+      return NextResponse.json({ ok: true, finishedEarly: true, planRegenerated, session: finished });
     }
     const currentTemplate = session.schedule?.template ?? (() => {
       const sessionExerciseIds = new Set(session.sets.map((set) => set.exerciseId));
@@ -127,7 +141,8 @@ export async function PATCH(request: Request) {
     const now = new Date();
     const additionalSeconds = Math.max(0, Math.floor((now.getTime() - session.startedAt.getTime()) / 1000));
     const updated = await prisma.workoutSession.update({ where: { id: sessionId }, data: { completedAt: now, endedEarly: false, elapsedSeconds: { increment: additionalSeconds } }, select: { id: true, completedAt: true, elapsedSeconds: true } });
-    return NextResponse.json({ ok: true, session: updated });
+    const planRegenerated = await refreshPlanAfterSession(user.id);
+    return NextResponse.json({ ok: true, planRegenerated, session: updated });
   } catch (error) {
     console.error("[workouts/session PATCH]", error);
     return NextResponse.json({ error: "Impossibile completare l'allenamento." }, { status: 500 });

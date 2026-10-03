@@ -66,9 +66,18 @@ export default function ActiveWorkoutPage() {
         if (!workoutExercise) continue;
         (grouped[workoutExercise.id] ??= []).push({ ...item, exerciseId: workoutExercise.id });
       }
+      Object.values(grouped).forEach(sets => sets.sort((a, b) => a.setNumber - b.setNumber));
       setLogs(grouped);
-      const firstIncomplete = workout.template.exercises.findIndex(exercise => { const sets = grouped[exercise.id] ?? []; return sets.length < exercise.sets || sets.slice(0, exercise.sets).some(set => !set.completed); });
-      if (firstIncomplete >= 0) { setExerciseIndex(firstIncomplete); const nextSets = grouped[workout.template.exercises[firstIncomplete].id] ?? []; const nextSet = nextSets.findIndex(item => !item.completed); setSetIndex(nextSet >= 0 ? nextSet : 0); }
+      const restored = Object.fromEntries(workout.template.exercises.map(exercise => {
+        const sets = buildLogs(exercise);
+        for (const saved of grouped[exercise.id] ?? []) {
+          const index = saved.setNumber - 1;
+          if (index >= 0 && index < sets.length) sets[index] = { ...sets[index], ...saved };
+        }
+        return [exercise.id, sets];
+      })) as Record<string, SetLog[]>;
+      const firstIncomplete = workout.template.exercises.findIndex(exercise => restored[exercise.id].some(set => !set.completed));
+      if (firstIncomplete >= 0) { setExerciseIndex(firstIncomplete); const nextSet = restored[workout.template.exercises[firstIncomplete].id].findIndex(item => !item.completed); setSetIndex(nextSet >= 0 ? nextSet : 0); }
       else { setExerciseIndex(Math.max(0, workout.template.exercises.length - 1)); setSetIndex(Math.max(0, (workout.template.exercises.at(-1)?.sets ?? 1) - 1)); }
       setPhase("ready");
     }).catch(errorValue => setError(errorValue instanceof Error ? errorValue.message : "Errore")).finally(() => setLoading(false));
@@ -151,7 +160,15 @@ export default function ActiveWorkoutPage() {
   }, [data, templateId]);
 
   const exercise = data?.template.exercises[exerciseIndex] ?? null;
-  const exerciseLogs = useMemo(() => exercise ? (logs[exercise.id] ?? buildLogs(exercise, progressions[exercise.id])) : [], [exercise, logs, progressions]);
+  const exerciseLogs = useMemo(() => {
+    if (!exercise) return [];
+    const restored = buildLogs(exercise, progressions[exercise.id]);
+    for (const saved of logs[exercise.id] ?? []) {
+      const index = saved.setNumber - 1;
+      if (index >= 0 && index < restored.length) restored[index] = { ...restored[index], ...saved };
+    }
+    return restored;
+  }, [exercise, logs, progressions]);
   const currentSet = exerciseLogs[setIndex] ?? null;
   const completedCount = data?.template.exercises.reduce((sum, item) => sum + (logs[item.id] ?? []).filter(set => set.completed).length, 0) ?? 0;
   const totalSets = data?.template.exercises.reduce((sum, item) => sum + item.sets, 0) ?? 0;

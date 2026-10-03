@@ -32,8 +32,8 @@ export function getSplit(trainingDays: TrainingDays): SplitDay[] {
       ]
     case 6:
       return [
-        day("Push A", ["CHEST", "SHOULDERS", "TRICEPS"] as MusclePriority[]),
-        day("Pull A", ["BACK", "BICEPS"] as MusclePriority[]),
+        day("Push A", ["CHEST", "SHOULDERS", "ARMS"]),
+        day("Pull A", ["BACK", "ARMS"]),
         day("Legs A", ["QUADS", "HAMSTRINGS", "CALVES"]),
         day("Push B", ["CHEST", "SHOULDERS", "ARMS"]),
         day("Pull B", ["BACK", "ARMS", "CORE"]),

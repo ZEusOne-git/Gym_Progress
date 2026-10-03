@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { recordAudit } from "@/lib/audit";
+import { findAlternativeExercise, isEquipmentCompatible, parseEquipment } from "@/lib/equipment";
 
 async function requireAdmin() {
   const user = await getCurrentUser();
@@ -45,7 +46,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
           sessionMinutes: true,
         },
       },
-      onboarding: { select: { primaryGoal: true, completedAt: true } },
+      onboarding: { select: { primaryGoal: true, completedAt: true, equipmentJson: true } },
       plans: {
         where: { isActive: true },
         orderBy: { updatedAt: "desc" },
@@ -109,13 +110,29 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
           dayNumber: true,
           name: true,
           estimatedMins: true,
-          _count: { select: { exercises: true } },
+          exercises: {
+            select: {
+              exercise: { select: { equipment: true } },
+            },
+          },
         },
       },
     },
   });
 
-  return NextResponse.json({ user, templates });
+  const available = parseEquipment(user.onboarding?.equipmentJson);
+  const enrichedTemplates = templates.map(plan => {
+    const exerciseRequirements = plan.templates.flatMap(day => day.exercises.map(item => parseEquipment(item.exercise.equipment)));
+    const relevant = exerciseRequirements.filter(requirements => requirements.length > 0);
+    const compatible = relevant.filter(requirements => isEquipmentCompatible(requirements, available)).length;
+    return {
+      ...plan,
+      templates: plan.templates.map(day => ({ id: day.id, dayNumber: day.dayNumber, name: day.name, estimatedMins: day.estimatedMins, _count: { exercises: day.exercises.length } })),
+      equipmentFit: { total: relevant.length, compatible, percent: relevant.length ? Math.round(compatible / relevant.length * 100) : 100 },
+    };
+  });
+
+  return NextResponse.json({ user: { ...user, onboarding: user.onboarding ? { ...user.onboarding, equipment: available } : null }, templates: enrichedTemplates });
 }
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -127,19 +144,50 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!templatePlanId) return NextResponse.json({ error: "Seleziona un programma." }, { status: 400 });
 
   const [user, source] = await Promise.all([
-    prisma.user.findUnique({ where: { id }, select: { id: true, profile: { select: { trainingDays: true } } } }),
+    prisma.user.findUnique({ where: { id }, select: { id: true, profile: { select: { trainingDays: true } }, onboarding: { select: { equipmentJson: true } } } }),
     prisma.workoutPlan.findFirst({
       where: { id: templatePlanId, isTemplate: true, isActive: true },
       include: {
         templates: {
           orderBy: { dayNumber: "asc" },
-          include: { exercises: { orderBy: { orderIndex: "asc" } } },
+          include: {
+            exercises: {
+              orderBy: { orderIndex: "asc" },
+              include: { exercise: { select: { id: true, name: true, category: true, primaryMuscles: true, equipment: true, difficulty: true } } },
+            },
+          },
         },
       },
     }),
   ]);
   if (!user) return NextResponse.json({ error: "Utente non trovato" }, { status: 404 });
   if (!source) return NextResponse.json({ error: "Programma non disponibile." }, { status: 404 });
+
+  const available = parseEquipment(user.onboarding?.equipmentJson);
+  const catalog = await prisma.exercise.findMany({
+    where: { isActive: true },
+    select: { id: true, name: true, category: true, primaryMuscles: true, equipment: true, difficulty: true },
+  });
+  const resolvedExercises = new Map<string, { exerciseId: string; adapted: boolean }>();
+  const incompatible: string[] = [];
+  for (const day of source.templates) {
+    for (const item of day.exercises) {
+      const requirements = parseEquipment(item.exercise.equipment);
+      if (isEquipmentCompatible(requirements, available)) {
+        resolvedExercises.set(item.id, { exerciseId: item.exerciseId, adapted: false });
+        continue;
+      }
+      const alternative = findAlternativeExercise(item.exercise, catalog, available);
+      if (!alternative) {
+        incompatible.push(item.exercise.name);
+        continue;
+      }
+      resolvedExercises.set(item.id, { exerciseId: alternative.id, adapted: true });
+    }
+  }
+  if (incompatible.length) {
+    return NextResponse.json({ error: `Attrezzatura non compatibile per: ${[...new Set(incompatible)].join(", ")}. Aggiorna il programma o il profilo attrezzatura dell'atleta prima di assegnarlo.` }, { status: 409 });
+  }
 
   const weekdays = defaultWeekdays(source.templates.length, user.profile?.trainingDays ?? null);
   const weekdayLabels = ["Dom", "Lun", "Mar", "Mer", "Gio", "Ven", "Sab"];
@@ -166,8 +214,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
             name: day.name,
             estimatedMins: day.estimatedMins,
             exercises: {
-              create: day.exercises.map(ex => ({
-                exerciseId: ex.exerciseId,
+              create: day.exercises.map(ex => {
+                const resolved = resolvedExercises.get(ex.id) ?? { exerciseId: ex.exerciseId, adapted: false };
+                return {
+                exerciseId: resolved.exerciseId,
                 orderIndex: ex.orderIndex,
                 sets: ex.sets,
                 repMin: ex.repMin,
@@ -176,11 +226,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
                 restSeconds: ex.restSeconds,
                 setType: ex.setType,
                 progressionType: ex.progressionType,
-                loadIncrement: ex.loadIncrement,
+                loadIncrement: resolved.adapted ? null : ex.loadIncrement,
                 tempo: ex.tempo,
-                targetWeight: ex.targetWeight,
-                notes: ex.notes,
-              })),
+                targetWeight: resolved.adapted ? null : ex.targetWeight,
+                notes: resolved.adapted ? "Esercizio adattato all'attrezzatura disponibile." : ex.notes,
+              };}),
             },
           })),
         },
@@ -202,10 +252,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return created;
   });
 
-  await recordAudit({ userId: admin.id, action: "ASSIGN", entity: "WorkoutPlan", entityId: plan.id, metadata: { userId: user.id, name: plan.name } });
+  const adaptedCount = [...resolvedExercises.values()].filter(item => item.adapted).length;
+  await recordAudit({ userId: admin.id, action: "ASSIGN", entity: "WorkoutPlan", entityId: plan.id, metadata: { userId: user.id, name: plan.name, adaptedExercises: adaptedCount } });
 
   return NextResponse.json({
     plan,
+    adapted: { count: adaptedCount, applied: adaptedCount > 0 },
     recurrence: {
       weeks: 12,
       weekdays,

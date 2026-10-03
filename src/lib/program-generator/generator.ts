@@ -48,12 +48,23 @@ function addCandidate(candidate: ExerciseCandidate, selected: ExerciseCandidate[
   }
 }
 
+function exercisesForSession(preferences: PlanPreferences) {
+  const minutes = preferences.sessionMinutes ?? 45;
+  if (minutes <= 30) return 4;
+  if (minutes <= 45) return 5;
+  if (minutes <= 60) return 6;
+  return 7;
+}
+
 export function generatePlan(preferences: PlanPreferences, candidates: ExerciseCandidate[]): { name: string; days: GeneratedDay[] } {
   const split = getSplit(preferences.trainingDays);
   const prescription = prescriptionFor(preferences);
   const priorities = new Set(preferences.priorities ?? []);
   const usedThisWeek = new Map<string, number>();
-  const exercisesPerDay = preferences.experience === "BEGINNER" ? 5 : preferences.trainingDays >= 5 ? 6 : 5;
+  const exercisesPerDay = Math.min(
+    exercisesForSession(preferences),
+    preferences.experience === "BEGINNER" ? 6 : 7,
+  );
 
   const days = split.map((splitDay) => {
     const focus = [...splitDay.focus].sort((a, b) => Number(priorities.has(b)) - Number(priorities.has(a)));

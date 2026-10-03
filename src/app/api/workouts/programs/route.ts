@@ -54,8 +54,9 @@ export async function GET() {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Non autorizzato" }, { status: 401 });
 
-  const [onboarding, plans, current] = await Promise.all([
+  const [onboarding, profile, plans, current] = await Promise.all([
     prisma.onboardingResponse.findUnique({ where: { userId: user.id }, select: { equipmentJson: true } }),
+    prisma.profile.findUnique({ where: { userId: user.id }, select: { trainingDays: true } }),
     prisma.workoutPlan.findMany({
       where: { isTemplate: true, isActive: true },
       orderBy: { updatedAt: "desc" },
@@ -89,9 +90,10 @@ export async function GET() {
     name: plan.name,
     templates: plan.templates,
     equipmentFit: planEquipmentFit(plan, available),
+    trainingDaysFit: profile?.trainingDays == null || profile.trainingDays === plan.templates.length,
   }));
 
-  return NextResponse.json({ plans: enrichedPlans, current, equipment: available });
+  return NextResponse.json({ plans: enrichedPlans, current, equipment: available, preferredTrainingDays: profile?.trainingDays ?? null });
 }
 
 export async function POST(request: Request) {
@@ -101,8 +103,7 @@ export async function POST(request: Request) {
   const templatePlanId = typeof body.templatePlanId === "string" ? body.templatePlanId : "";
   if (!templatePlanId) return NextResponse.json({ error: "Seleziona un programma." }, { status: 400 });
 
-  const [profile, onboarding, source, catalog] = await Promise.all([
-    prisma.profile.findUnique({ where: { userId: user.id }, select: { trainingDays: true } }),
+  const [onboarding, source, catalog] = await Promise.all([
     prisma.onboardingResponse.findUnique({ where: { userId: user.id }, select: { equipmentJson: true } }),
     prisma.workoutPlan.findFirst({
       where: { id: templatePlanId, isTemplate: true, isActive: true },
@@ -154,7 +155,7 @@ export async function POST(request: Request) {
   }
 
   const count = Math.max(1, Math.min(source.templates.length, 7));
-  const weekdays = weekdaysFor(profile?.trainingDays === count ? count : count);
+  const weekdays = weekdaysFor(count);
   const { today, monday } = nextMonday();
 
   const result = await prisma.$transaction(async tx => {

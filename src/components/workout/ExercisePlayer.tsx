@@ -3,6 +3,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 
+export type ExerciseMedia = {
+  url: string;
+  type: string;
+  attribution?: string | null;
+  sourceUrl?: string | null;
+};
+
 export type Exercise = {
   name: string;
   muscle: string;
@@ -15,6 +22,7 @@ export type Exercise = {
   mediaType?: string | null;
   attribution?: string | null;
   sourceUrl?: string | null;
+  media?: ExerciseMedia[];
 };
 
 type Props = {
@@ -29,7 +37,12 @@ export default function ExercisePlayer({ exercise, exerciseIndex, totalExercises
   const [completed, setCompleted] = useState(0);
   const [seconds, setSeconds] = useState(Math.max(exercise.rest || 120, 1));
   const [paused, setPaused] = useState(false);
+  const [poseIndex, setPoseIndex] = useState(0);
 
+  const media = exercise.media?.length ? exercise.media : exercise.mediaUrl ? [{ url: exercise.mediaUrl, type: exercise.mediaType || "IMAGE", attribution: exercise.attribution, sourceUrl: exercise.sourceUrl }] : [];
+  const imageMedia = media.filter(item => item.type === "IMAGE");
+  const isPoseSequence = imageMedia.length > 1 && imageMedia.every(item => item.url.includes("exercise-dataset.com"));
+  const activeMedia = isPoseSequence ? imageMedia[poseIndex % imageMedia.length] : media[0];
   const currentSet = Math.min(completed + 1, exercise.sets);
   const isComplete = completed >= exercise.sets;
   const timer = `${Math.floor(seconds / 60).toString().padStart(2, "0")}:${(seconds % 60).toString().padStart(2, "0")}`;
@@ -43,13 +56,23 @@ export default function ExercisePlayer({ exercise, exerciseIndex, totalExercises
   }, [paused, isComplete, seconds]);
 
   useEffect(() => {
+    setPoseIndex(0);
+  }, [exercise.mediaUrl, exercise.name]);
+
+  useEffect(() => {
+    if (!isPoseSequence || paused || isComplete) return;
+    const id = window.setInterval(() => setPoseIndex(value => (value + 1) % imageMedia.length), 700);
+    return () => window.clearInterval(id);
+  }, [imageMedia.length, isPoseSequence, paused, isComplete]);
+
+  useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
     video.loop = true;
     video.muted = true;
     if (!paused && !isComplete) video.play().catch(() => undefined);
     else video.pause();
-  }, [paused, isComplete, exercise.mediaUrl]);
+  }, [paused, isComplete, activeMedia?.url]);
 
   function completeSet() {
     if (isComplete) return;
@@ -65,10 +88,10 @@ export default function ExercisePlayer({ exercise, exerciseIndex, totalExercises
     <main className="min-h-screen bg-[#07100e] text-white">
       <section className="relative mx-auto flex min-h-screen w-full max-w-[430px] flex-col overflow-hidden bg-black shadow-2xl">
         <div className="relative min-h-0 flex-1 bg-black">
-          {exercise.mediaUrl ? (
-            exercise.mediaType === "IMAGE" || exercise.mediaType === "GIF" ? (
+          {activeMedia ? (
+            activeMedia.type === "IMAGE" || activeMedia.type === "GIF" ? (
               <img
-                src={exercise.mediaUrl}
+                src={activeMedia.url}
                 alt={exercise.name}
                 loading="eager"
                 decoding="async"
@@ -77,7 +100,7 @@ export default function ExercisePlayer({ exercise, exerciseIndex, totalExercises
             ) : (
               <video
                 ref={videoRef}
-                src={exercise.mediaUrl}
+                src={activeMedia.url}
                 playsInline
                 muted
                 loop
@@ -91,6 +114,7 @@ export default function ExercisePlayer({ exercise, exerciseIndex, totalExercises
             </div>
           )}
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/25 via-transparent to-black/20" />
+          {isPoseSequence && <div className="absolute bottom-3 left-3 z-10 rounded-full bg-black/40 px-3 py-1.5 text-[9px] font-bold uppercase tracking-[0.14em] text-white/75 backdrop-blur-md">Anteprima movimento</div>}
           <Link href="/workout" aria-label="Torna al workout" className="absolute left-3 top-3 z-10 flex h-10 w-10 items-center justify-center rounded-xl bg-black/35 text-xl backdrop-blur-md transition active:scale-95">←</Link>
           <div className="absolute right-3 top-3 z-10 rounded-xl bg-black/35 px-3 py-2 text-[10px] font-black uppercase tracking-[0.16em] text-white/80 backdrop-blur-md">{exerciseProgress}</div>
         </div>
@@ -99,7 +123,7 @@ export default function ExercisePlayer({ exercise, exerciseIndex, totalExercises
           <div className="mx-auto mb-4 h-1 w-9 rounded-full bg-white/15" />
           <div className="text-center">
             <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-white/40">{exercise.name}</p>
-            {exercise.attribution && <a href={exercise.sourceUrl || "#"} target={exercise.sourceUrl ? "_blank" : undefined} rel={exercise.sourceUrl ? "noreferrer" : undefined} className="mt-1 inline-flex text-[9px] font-semibold text-white/45 underline decoration-white/25 underline-offset-2">Dimostrazione: {exercise.attribution}</a>}
+            {(activeMedia?.attribution || exercise.attribution) && <a href={activeMedia?.sourceUrl || exercise.sourceUrl || "#"} target={(activeMedia?.sourceUrl || exercise.sourceUrl) ? "_blank" : undefined} rel={(activeMedia?.sourceUrl || exercise.sourceUrl) ? "noreferrer" : undefined} className="mt-1 inline-flex text-[9px] font-semibold text-white/45 underline decoration-white/25 underline-offset-2">Dimostrazione: {activeMedia?.attribution || exercise.attribution}</a>}
             <p className="mt-2 text-[46px] font-light leading-none tracking-[-0.04em] tabular-nums">{timer}</p>
             <div className="mt-2 flex items-center justify-center gap-2 text-[11px] font-semibold text-white/55">
               <span>Serie {setProgress}</span><span className="h-1 w-1 rounded-full bg-white/25" /><span>{exercise.reps} reps</span>

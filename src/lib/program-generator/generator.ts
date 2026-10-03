@@ -19,21 +19,16 @@ const prescriptionFor = (preferences: PlanPreferences) => {
   }
 };
 
-const aliases: Record<string, MusclePriority> = {
-  BICEPS: "ARMS",
-  TRICEPS: "ARMS",
-  ABS: "CORE",
+const aliases: Record<string, MusclePriority> = { BICEPS: "ARMS", TRICEPS: "ARMS", ABS: "CORE" };
+const normalizedMuscles = (groups: MusclePriority[]) => groups.map((group) => aliases[group] ?? group);
+const goalNames: Record<PlanPreferences["goal"], string> = {
+  HYPERTROPHY: "Ipertrofia",
+  STRENGTH: "Forza",
+  RECOMPOSITION: "Ricomp",
+  GENERAL_FITNESS: "Fitness",
 };
 
-const normalizedMuscles = (groups: MusclePriority[]) => groups.map((group) => aliases[group] ?? group);
-
-function coverageScore(
-  candidate: ExerciseCandidate,
-  focus: MusclePriority[],
-  priorities: Set<MusclePriority>,
-  counts: Map<MusclePriority, number>,
-  usedThisWeek: Map<string, number>,
-) {
+function coverageScore(candidate: ExerciseCandidate, focus: MusclePriority[], priorities: Set<MusclePriority>, counts: Map<MusclePriority, number>, usedThisWeek: Map<string, number>) {
   const groups = normalizedMuscles(candidate.muscleGroups);
   let score = 0;
   for (const group of groups) {
@@ -49,9 +44,7 @@ function coverageScore(
 
 function addCandidate(candidate: ExerciseCandidate, selected: ExerciseCandidate[], counts: Map<MusclePriority, number>) {
   selected.push(candidate);
-  for (const group of normalizedMuscles(candidate.muscleGroups)) {
-    counts.set(group, (counts.get(group) ?? 0) + 1);
-  }
+  for (const group of normalizedMuscles(candidate.muscleGroups)) counts.set(group, (counts.get(group) ?? 0) + 1);
 }
 
 function exercisesForSession(preferences: PlanPreferences) {
@@ -62,15 +55,7 @@ function exercisesForSession(preferences: PlanPreferences) {
   return 7;
 }
 
-function pickBest(
-  pool: ExerciseCandidate[],
-  selected: ExerciseCandidate[],
-  focus: MusclePriority[],
-  priorities: Set<MusclePriority>,
-  counts: Map<MusclePriority, number>,
-  usedThisWeek: Map<string, number>,
-  muscle?: MusclePriority,
-) {
+function pickBest(pool: ExerciseCandidate[], selected: ExerciseCandidate[], focus: MusclePriority[], priorities: Set<MusclePriority>, counts: Map<MusclePriority, number>, usedThisWeek: Map<string, number>, muscle?: MusclePriority) {
   return pool
     .filter((candidate) => !selected.some((item) => item.id === candidate.id))
     .filter((candidate) => !muscle || normalizedMuscles(candidate.muscleGroups).includes(muscle))
@@ -90,29 +75,22 @@ export function generatePlan(preferences: PlanPreferences, candidates: ExerciseC
 
   const days = split.map((splitDay) => {
     const focus = [...splitDay.focus].sort((a, b) => Number(priorities.has(b)) - Number(priorities.has(a)));
-    // Keep the complete compatible catalog available so variety is decided by
-    // the generator rather than by an arbitrary top-N catalog slice.
     const pool = selectExercises(candidates, preferences, focus, candidates.length);
     const selected: ExerciseCandidate[] = [];
     const counts = new Map<MusclePriority, number>();
 
-    // First guarantee explicit priorities that belong to this day's split.
     for (const priority of priorities) {
       if (!focus.includes(priority) || selected.length >= exercisesPerDay) continue;
       const match = pickBest(pool, selected, focus, priorities, counts, usedThisWeek, priority);
       if (match) addCandidate(match, selected, counts);
     }
 
-    // Then cover the split itself, preferring exercises that have not appeared
-    // earlier in the same week.
     for (const muscle of focus) {
       if (selected.length >= exercisesPerDay) break;
       const match = pickBest(pool, selected, focus, priorities, counts, usedThisWeek, muscle);
       if (match) addCandidate(match, selected, counts);
     }
 
-    // Fill remaining slots with unused exercises first. Reuse is only allowed
-    // when the compatible catalog is too small for the requested plan.
     while (selected.length < exercisesPerDay) {
       const unused = pool.filter((candidate) => (usedThisWeek.get(candidate.id) ?? 0) === 0);
       const next = pickBest(unused.length ? unused : pool, selected, focus, priorities, counts, usedThisWeek);
@@ -124,21 +102,12 @@ export function generatePlan(preferences: PlanPreferences, candidates: ExerciseC
       usedThisWeek.set(candidate.id, (usedThisWeek.get(candidate.id) ?? 0) + 1);
       const isPriority = normalizedMuscles(candidate.muscleGroups).some((group) => priorities.has(group));
       const accessory = orderIndex >= Math.max(3, selected.length - 2);
-      const sets = isPriority && !accessory && preferences.experience !== "BEGINNER"
-        ? prescription.sets + 1
-        : prescription.sets;
-      return {
-        exerciseId: candidate.id,
-        sets,
-        repMin: prescription.repMin,
-        repMax: prescription.repMax,
-        rir: prescription.rir,
-        restSeconds: prescription.restSeconds,
-      };
+      const sets = isPriority && !accessory && preferences.experience !== "BEGINNER" ? prescription.sets + 1 : prescription.sets;
+      return { exerciseId: candidate.id, sets, repMin: prescription.repMin, repMax: prescription.repMax, rir: prescription.rir, restSeconds: prescription.restSeconds };
     });
 
     return { ...splitDay, name: splitDay.name, exercises };
   });
 
-  return { name: `${preferences.goal} · ${preferences.trainingDays} giorni`, days };
+  return { name: `${goalNames[preferences.goal]} · ${preferences.trainingDays} giorni`, days };
 }

@@ -5,7 +5,8 @@ import Link from "next/link";
 import { ArrowLeft, Check, ChevronRight, Clock3, Loader2, Play, SkipForward, Trophy } from "lucide-react";
 import { getExerciseHowTo } from "@/lib/program-generator/exercise-how-to";
 
-type Exercise = { id: string; sets: number; repMin: number; repMax: number; restSeconds: number; rirTarget?: number | null; targetWeight?: number | null; exercise: { id: string; name: string; slug: string; category: string } };
+type ExerciseMedia = { url: string; type: string; thumbnailUrl?: string | null; sourceName?: string | null; sourceUrl?: string | null; attribution?: string | null };
+type Exercise = { id: string; sets: number; repMin: number; repMax: number; restSeconds: number; rirTarget?: number | null; targetWeight?: number | null; exercise: { id: string; name: string; slug: string; category: string; media: ExerciseMedia[] } };
 type Data = { template: { id: string; dayNumber: number; name: string; exercises: Exercise[] }; plan: { name: string } };
 type SetLog = { id?: string; exerciseId: string; setNumber: number; weight: number; reps: number; rir: number | null; completed: boolean };
 type Progression = { last: { completedAt: string | null; sets: { setNumber: number; weight: number; reps: number; rir: number | null }[] } | null; recommendation: { weight: number; reps: number; reason: string } };
@@ -154,6 +155,9 @@ export default function ActiveWorkoutPage() {
   const completedVolume = Object.values(logs).flat().filter(set => set.completed).reduce((sum, set) => sum + set.weight * set.reps, 0);
   const howTo = exercise ? getExerciseHowTo(exercise.exercise.slug) : null;
   const animationUrl = exercise ? `/animations/${exercise.exercise.slug}.webp` : null;
+  const mediaFallback = exercise?.exercise.media?.find(item => item.type === "IMAGE" || item.type === "GIF") ?? exercise?.exercise.media?.[0] ?? null;
+  const demonstrationUrl = animationUrl ? animationUrl : mediaFallback?.url ?? null;
+  const demonstrationIsLegacy = Boolean(mediaFallback && !exercise?.exercise.slug);
 
   function updateCurrent(field: "weight" | "reps" | "rir", value: string) {
     if (!exercise || !currentSet || currentSet.completed || phase !== "ready") return;
@@ -221,7 +225,7 @@ export default function ActiveWorkoutPage() {
   return <main className="relative h-[100dvh] min-h-[620px] overflow-hidden bg-black text-white">
     <div className="absolute inset-0">
       <div className="absolute inset-0 flex items-center justify-center bg-[#09110f]">
-        <img src={animationUrl ?? ""} alt={`Animazione di ${exercise.exercise.name}`} className="h-full w-full object-contain" />
+        {demonstrationUrl ? <img src={demonstrationUrl} alt={`Dimostrazione di ${exercise.exercise.name}`} className="h-full w-full object-contain" /> : <div className="flex h-full w-full items-center justify-center text-center text-white/50"><div><div className="text-4xl">▶</div><p className="mt-3 text-xs font-semibold">Nessuna dimostrazione disponibile</p></div></div>}
       </div>
       <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/10 to-black/95" />
     </div>

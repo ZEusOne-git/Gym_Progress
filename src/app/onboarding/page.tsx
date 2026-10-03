@@ -7,39 +7,46 @@ import { useEffect, useMemo, useState } from "react";
 export const dynamic = "force-dynamic";
 
 const steps = [
-  { title: "About you", icon: UserRound },
-  { title: "Your body", icon: Ruler },
-  { title: "Your goal", icon: Target },
-  { title: "Training", icon: Dumbbell },
-  { title: "Schedule", icon: CalendarDays },
-  { title: "Priorities", icon: Sparkles },
-  { title: "Preferences", icon: HeartPulse },
+  { title: "Partiamo da te", icon: UserRound },
+  { title: "Il tuo punto di partenza", icon: Ruler },
+  { title: "Il tuo obiettivo", icon: Target },
+  { title: "La tua esperienza", icon: Dumbbell },
+  { title: "La tua settimana", icon: CalendarDays },
+  { title: "Le tue priorità", icon: Sparkles },
+  { title: "Le tue preferenze", icon: HeartPulse },
 ];
 
 const goals = [
-  ["RECOMP", "Lose fat while building muscle"],
-  ["FAT LOSS", "Reduce body fat and keep strength"],
-  ["MUSCLE", "Build muscle and size"],
-  ["STRENGTH", "Get stronger on the main lifts"],
+  ["RECOMP", "Perdere grasso e costruire muscolo"],
+  ["FAT LOSS", "Ridurre il grasso mantenendo la forza"],
+  ["MUSCLE", "Aumentare massa e muscoli"],
+  ["STRENGTH", "Diventare più forte negli esercizi principali"],
 ];
 
 const priorities = ["Arms", "Shoulders", "Chest", "Back", "Abs", "Glutes", "Quads", "Hamstrings", "Calves", "Lower back"];
+const equipmentOptions = [
+  { id: "machines", label: "Macchine e cavi" },
+  { id: "barbells", label: "Bilancieri" },
+  { id: "free_weights", label: "Manubri e pesi liberi" },
+  { id: "cardio", label: "Attrezzatura cardio" },
+] as const;
 
 type FormState = {
   name: string;
   age: string;
-  sex: string;
   weight: string;
   height: string;
   goal: string;
   experience: string;
   days: string;
   priorities: string[];
+  equipment: string[];
   running: string;
   notes: string;
 };
 
-const emptyForm: FormState = { name: "", age: "", sex: "", weight: "", height: "", goal: "", experience: "", days: "4", priorities: [], running: "", notes: "" };
+const defaultEquipment = ["machines", "barbells", "free_weights", "cardio"];
+const emptyForm: FormState = { name: "", age: "", weight: "", height: "", goal: "", experience: "", days: "4", priorities: [], equipment: defaultEquipment, running: "", notes: "" };
 
 export default function OnboardingPage() {
   const [editing, setEditing] = useState(false);
@@ -79,17 +86,24 @@ export default function OnboardingPage() {
         } catch { prioritiesFromDb = []; }
         let preferences: { cardio?: string; trainingStyle?: string } = {};
         try { preferences = JSON.parse(onboarding.preferencesJson ?? "{}"); } catch { preferences = {}; }
+        let equipment: string[] = defaultEquipment;
+        try {
+          const storedEquipment = JSON.parse(onboarding.equipmentJson ?? "null");
+          if (Array.isArray(storedEquipment)) {
+            equipment = storedEquipment.filter((item: unknown): item is string => typeof item === "string" && equipmentOptions.some(option => option.id === item));
+          }
+        } catch { equipment = defaultEquipment; }
         const goalReverse: Record<string, string> = { RECOMPOSITION: "RECOMP", FAT_LOSS: "FAT LOSS", MUSCLE_GAIN: "MUSCLE", STRENGTH: "STRENGTH" };
         setForm({
           name: profile.firstName ?? "",
           age: profile.age?.toString() ?? "",
-          sex: profile.sex ?? "",
           weight: profile.currentWeight?.toString() ?? "",
           height: profile.heightCm?.toString() ?? "",
           goal: goalReverse[onboarding.primaryGoal] ?? "",
           experience: profile.experience ?? "",
           days: profile.trainingDays?.toString() ?? "4",
           priorities: prioritiesFromDb.filter((item) => priorities.includes(item)),
+          equipment,
           running: preferences.cardio ?? "",
           notes: preferences.trainingStyle ?? "",
         });
@@ -101,6 +115,7 @@ export default function OnboardingPage() {
 
   const update = (key: keyof FormState, value: string) => setForm((current) => ({ ...current, [key]: value }));
   const togglePriority = (value: string) => setForm((current) => ({ ...current, priorities: current.priorities.includes(value) ? current.priorities.filter((item) => item !== value) : [...current.priorities, value] }));
+  const toggleEquipment = (value: string) => setForm((current) => ({ ...current, equipment: current.equipment.includes(value) ? current.equipment.filter((item) => item !== value) : [...current.equipment, value] }));
 
   const save = async (completed = false) => {
     setSaving(true);
@@ -121,33 +136,45 @@ export default function OnboardingPage() {
 
   const next = () => save(step === steps.length - 1);
 
-  if (loading) return <main className="flex min-h-screen items-center justify-center px-5"><p className="text-sm font-bold text-[var(--muted)]">LOADING YOUR PROFILE...</p></main>;
+  if (loading) return <main className="flex min-h-screen items-center justify-center px-5"><p className="text-sm font-bold text-[var(--muted)]">CARICAMENTO DEL PROFILO...</p></main>;
 
   return (
     <main className="min-h-screen">
       <div className="mx-auto flex min-h-screen w-full max-w-md flex-col px-5 pb-7 pt-6">
         <header className="mb-7 flex items-center gap-3">
-          {step === 0 ? <Link href={editing ? "/profile" : "/register"} aria-label="Back" className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--surface)] text-[var(--muted)]"><ArrowLeft size={18} /></Link> : <button onClick={() => setStep((current) => current - 1)} aria-label="Back" className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--surface)] text-[var(--muted)]"><ArrowLeft size={18} /></button>}
+          {step === 0 ? <Link href={editing ? "/profile" : "/register"} aria-label="Indietro" className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--surface)] text-[var(--muted)]"><ArrowLeft size={18} /></Link> : <button onClick={() => setStep((current) => current - 1)} aria-label="Indietro" className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--surface)] text-[var(--muted)]"><ArrowLeft size={18} /></button>}
           <div className="flex-1">
-            <div className="mb-2 flex items-center justify-between text-xs font-bold text-[var(--muted)]"><span>{editing ? "MODIFICA PROFILO" : "PERSONAL SETUP"}</span><span>{step + 1} / {steps.length}</span></div>
+            <div className="mb-2 flex items-center justify-between text-xs font-bold text-[var(--muted)]"><span>{editing ? "MODIFICA PROFILO" : "IL TUO PROFILO"}</span><span>{step + 1} / {steps.length}</span></div>
             <div className="h-1.5 overflow-hidden rounded-full bg-[var(--surface)]"><div className="h-full rounded-full bg-[var(--accent)] transition-all" style={{ width: `${progress}%` }} /></div>
           </div>
         </header>
 
         <section className="flex-1">
           <div className="mb-8 flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--accent)] text-[var(--accent-foreground)]"><StepIcon size={22} /></div>
-          <p className="mb-2 text-sm font-bold text-[var(--accent)]">STEP {step + 1}</p>
+          <p className="mb-2 text-sm font-bold text-[var(--accent)]">FASE {step + 1}</p>
           <h1 className="text-4xl font-black tracking-tight">{steps[step].title}</h1>
-          <p className="mt-3 leading-6 text-[var(--muted)]">{step === 0 && "A few basics help us personalize your starting point."}{step === 1 && "We use these numbers to understand your starting point."}{step === 2 && "Choose the result that matters most right now."}{step === 3 && "Tell us how experienced you are with strength training."}{step === 4 && "Consistency matters more than perfect workouts."}{step === 5 && "Pick the areas you want to prioritize. You can change them later."}{step === 6 && "Finish with the preferences that shape your plan."}</p>
+          <p className="mt-3 leading-6 text-[var(--muted)]">{step === 0 && "Ci bastano poche informazioni per iniziare a personalizzare il tuo percorso."}{step === 1 && "Questi dati descrivono il tuo punto di partenza e puoi aggiornarli in seguito."}{step === 2 && "Scegli il risultato che conta di più per te in questo momento."}{step === 3 && "Indica quanta esperienza hai con l’allenamento di forza."}{step === 4 && "La costanza conta più della settimana perfetta."}{step === 5 && "Scegli le zone che vuoi dare più attenzione. Potrai cambiarle quando vuoi."}{step === 6 && "Completa il profilo con i tuoi orari e l’attrezzatura che puoi usare."}</p>
 
           <div className="mt-8 space-y-4">
-            {step === 0 && <><Field label="Name" value={form.name} onChange={(value) => update("name", value)} placeholder="Your name" /><Field label="Age" value={form.age} onChange={(value) => update("age", value)} placeholder="29" type="number" /><Choice label="Sex" options={["Male", "Female", "Prefer not to say"]} value={form.sex} onChange={(value) => update("sex", value)} /></>}
-            {step === 1 && <div className="grid grid-cols-2 gap-3"><Field label="Weight (kg)" value={form.weight} onChange={(value) => update("weight", value)} placeholder="90" type="number" /><Field label="Height (cm)" value={form.height} onChange={(value) => update("height", value)} placeholder="180" type="number" /></div>}
+            {step === 0 && <><Field label="Nome" value={form.name} onChange={(value) => update("name", value)} placeholder="Il tuo nome" /><Field label="Età" value={form.age} onChange={(value) => update("age", value)} placeholder="29" type="number" /></>}
+            {step === 1 && <div className="grid grid-cols-2 gap-3"><Field label="Peso (kg)" value={form.weight} onChange={(value) => update("weight", value)} placeholder="90" type="number" /><Field label="Altezza (cm)" value={form.height} onChange={(value) => update("height", value)} placeholder="180" type="number" /></div>}
             {step === 2 && <div className="space-y-3">{goals.map(([title, description]) => <button key={title} onClick={() => update("goal", title)} className={`w-full rounded-2xl border p-4 text-left transition ${form.goal === title ? "border-[var(--accent)] bg-[var(--accent)] text-[var(--accent-foreground)]" : "border-[var(--border)] bg-[var(--surface)]"}`}><span className="block font-black">{title}</span><span className={`mt-1 block text-sm ${form.goal === title ? "opacity-70" : "text-[var(--muted)]"}`}>{description}</span></button>)}</div>}
-            {step === 3 && <Choice label="Training experience" options={["Beginner", "Intermediate", "Advanced"]} value={form.experience} onChange={(value) => update("experience", value)} />}
-            {step === 4 && <><Choice label="Days per week" options={["2", "3", "4", "5", "6"]} value={form.days} onChange={(value) => update("days", value)} /><Choice label="Cardio" options={["None", "1–2 sessions", "3+ sessions", "I want to add running"]} value={form.running} onChange={(value) => update("running", value)} /></>}
+            {step === 3 && <Choice label="Esperienza con i pesi" options={["Beginner", "Intermediate", "Advanced"]} value={form.experience} onChange={(value) => update("experience", value)} />}
+            {step === 4 && <><Choice label="Giorni a settimana" options={["2", "3", "4", "5", "6"]} value={form.days} onChange={(value) => update("days", value)} /><Choice label="Attività cardio" options={["None", "1–2 sessions", "3+ sessions", "I want to add running"]} value={form.running} onChange={(value) => update("running", value)} /></>}
             {step === 5 && <div className="grid grid-cols-2 gap-3">{priorities.map((item) => <button key={item} onClick={() => togglePriority(item)} className={`rounded-2xl border px-4 py-4 text-left text-sm font-bold transition ${form.priorities.includes(item) ? "border-[var(--accent)] bg-[var(--accent)] text-[var(--accent-foreground)]" : "border-[var(--border)] bg-[var(--surface)]"}`}><span className="mr-2 inline-flex h-5 w-5 items-center justify-center rounded-full border border-current">{form.priorities.includes(item) && <Check size={13} />}</span>{item}</button>)}</div>}
-            {step === 6 && <><Choice label="How do you prefer to train?" options={["Mostly machines", "Free weights", "A mix of everything"]} value={form.notes} onChange={(value) => update("notes", value)} /><div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4"><p className="text-sm font-bold">Your setup</p><p className="mt-2 text-sm leading-6 text-[var(--muted)]">We&apos;ll assume access to a commercial gym, barbells, machines and a free-weight area. You can change equipment later.</p></div></>}
+            {step === 6 && <>
+              <div>
+                <p className="mb-2 text-sm font-semibold">Attrezzatura che hai a disposizione</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {equipmentOptions.map((option) => {
+                    const selected = form.equipment.includes(option.id);
+                    return <button type="button" key={option.id} aria-pressed={selected} onClick={() => toggleEquipment(option.id)} className={`flex min-h-14 items-center justify-between gap-2 rounded-2xl border px-3 py-3 text-left text-xs font-bold transition ${selected ? "border-[var(--accent)] bg-[var(--accent)] text-[var(--accent-foreground)]" : "border-[var(--border)] bg-[var(--surface)]"}`}><span>{option.label}</span>{selected && <Check size={15} strokeWidth={3} />}</button>;
+                  })}
+                </div>
+                <p className="mt-2 text-xs leading-5 text-[var(--muted)]">Seleziona solo ciò che usi davvero. Se lasci tutto deselezionato, considereremo gli esercizi a corpo libero.</p>
+              </div>
+              <Choice label="Come preferisci allenarti?" options={["Mostly machines", "Free weights", "A mix of everything"]} value={form.notes} onChange={(value) => update("notes", value)} />
+            </>}
           </div>
           {error && <div className="mt-4 rounded-2xl border border-red-400/30 bg-red-400/10 px-4 py-3 text-sm font-semibold text-red-300">{error}</div>}
         </section>
@@ -163,5 +190,17 @@ function Field({ label, value, onChange, placeholder, type = "text" }: { label: 
 }
 
 function Choice({ label, options, value, onChange }: { label: string; options: string[]; value: string; onChange: (value: string) => void }) {
-  return <div><p className="mb-2 text-sm font-semibold">{label}</p><div className="grid gap-2">{options.map((option) => <button type="button" key={option} onClick={() => onChange(option)} className={`rounded-2xl border px-4 py-4 text-left text-sm font-bold transition ${value === option ? "border-[var(--accent)] bg-[var(--accent)] text-[var(--accent-foreground)]" : "border-[var(--border)] bg-[var(--surface)]"}`}>{option}</button>)}</div></div>;
+  const labels: Record<string, string> = {
+    Beginner: "Principiante",
+    Intermediate: "Intermedio",
+    Advanced: "Avanzato",
+    None: "Nessuna",
+    "1–2 sessions": "1–2 sessioni",
+    "3+ sessions": "3 o più sessioni",
+    "I want to add running": "Vorrei iniziare a correre",
+    "Mostly machines": "Prevalentemente macchine",
+    "Free weights": "Pesi liberi",
+    "A mix of everything": "Un mix",
+  };
+  return <div><p className="mb-2 text-sm font-semibold">{label}</p><div className="grid gap-2">{options.map((option) => <button type="button" key={option} onClick={() => onChange(option)} className={`rounded-2xl border px-4 py-4 text-left text-sm font-bold transition ${value === option ? "border-[var(--accent)] bg-[var(--accent)] text-[var(--accent-foreground)]" : "border-[var(--border)] bg-[var(--surface)]"}`}>{labels[option] ?? option}</button>)}</div></div>;
 }

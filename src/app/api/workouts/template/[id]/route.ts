@@ -24,6 +24,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
           targetWeight: true,
           exercise: {
             select: {
+              id: true,
               name: true,
               category: true,
               media: { where: { isActive: true }, orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }], select: { url: true, type: true, thumbnailUrl: true, sourceName: true } },

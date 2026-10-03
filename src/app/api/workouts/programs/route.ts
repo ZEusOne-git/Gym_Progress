@@ -25,6 +25,18 @@ function planEquipmentFit(plan: { templates: { exercises: { exercise: { equipmen
   return { available, total: requirements.length, compatible, unsupported, percent: requirements.length ? Math.round((compatible / requirements.length) * 100) : 100 };
 }
 
+const generatedTemplateSelect = {
+  id: true,
+  dayNumber: true,
+  name: true,
+  estimatedMins: true,
+  _count: { select: { exercises: true } },
+  exercises: {
+    orderBy: { orderIndex: "asc" as const },
+    select: { exercise: { select: { id: true, name: true, equipment: true } }, sets: true, repMin: true, repMax: true },
+  },
+};
+
 export async function GET() {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Non autorizzato" }, { status: 401 });
@@ -40,7 +52,7 @@ export async function GET() {
     prisma.workoutPlan.findFirst({
       where: { userId: user.id, isActive: true, isTemplate: false },
       orderBy: { updatedAt: "desc" },
-      select: { id: true, name: true, templates: { orderBy: { dayNumber: "asc" }, select: { id: true, dayNumber: true, name: true, estimatedMins: true, _count: { select: { exercises: true } } } } },
+      select: { id: true, name: true, templates: { orderBy: { dayNumber: "asc" }, select: generatedTemplateSelect } },
     }),
   ]);
 
@@ -85,7 +97,7 @@ export async function POST(request: Request) {
     await tx.workoutSchedule.deleteMany({ where: { userId: user.id, scheduledDate: { gte: today }, session: { is: null } } });
     await tx.workoutSchedule.deleteMany({ where: { userId: user.id, scheduledDate: { gte: monday }, session: { is: { completedAt: { not: null } } } } });
     await tx.workoutPlan.updateMany({ where: { userId: user.id, isActive: true, isTemplate: false }, data: { isActive: false } });
-    const plan = await tx.workoutPlan.create({ data: { userId: user.id, name: source.name, version: source.version, isActive: true, isTemplate: false, templates: { create: source.templates.map(day => ({ dayNumber: day.dayNumber, name: day.name, estimatedMins: day.estimatedMins, exercises: { create: day.exercises.map(ex => { const exerciseId = resolvedExercises.get(ex.id) ?? ex.exerciseId; const adapted = exerciseId !== ex.exerciseId; return { exerciseId, orderIndex: ex.orderIndex, sets: ex.sets, repMin: ex.repMin, repMax: ex.repMax, rirTarget: ex.rirTarget, restSeconds: ex.restSeconds, setType: ex.setType, progressionType: ex.progressionType, loadIncrement: adapted ? null : ex.loadIncrement, tempo: ex.tempo, targetWeight: adapted ? null : ex.targetWeight, notes: adapted ? "Esercizio adattato all'attrezzatura disponibile." : ex.notes }; }) } })) } }, include: { templates: { orderBy: { dayNumber: "asc" } } } });
+    const plan = await tx.workoutPlan.create({ data: { userId: user.id, name: source.name, version: source.version, isActive: true, isTemplate: false, templates: { create: source.templates.map(day => ({ dayNumber: day.dayNumber, name: day.name, estimatedMins: day.estimatedMins, exercises: { create: day.exercises.map(ex => { const exerciseId = resolvedExercises.get(ex.id) ?? ex.exerciseId; const adapted = exerciseId !== ex.exerciseId; return { exerciseId, orderIndex: ex.orderIndex, sets: ex.sets, repMin: ex.repMin, repMax: ex.repMax, rirTarget: ex.rirTarget, restSeconds: ex.restSeconds, setType: ex.setType, progressionType: ex.progressionType, loadIncrement: adapted ? null : ex.loadIncrement, tempo: ex.tempo, targetWeight: adapted ? null : ex.targetWeight, notes: adapted ? "Esercizio adattato all'attrezzatura disponibile." : ex.notes }; }) } })) } }, include: { templates: { orderBy: { dayNumber: "asc" } } });
     const schedules: { userId: string; workoutPlanId: string; templateId: string; scheduledDate: Date }[] = [];
     for (let week = 0; week < 12; week++) for (let index = 0; index < plan.templates.length; index++) { const scheduledDate = new Date(monday); scheduledDate.setDate(monday.getDate() + week * 7 + (weekdays[index] - 1)); scheduledDate.setHours(12, 0, 0, 0); schedules.push({ userId: user.id, workoutPlanId: plan.id, templateId: plan.templates[index].id, scheduledDate }); }
     await tx.workoutSchedule.createMany({ data: schedules });

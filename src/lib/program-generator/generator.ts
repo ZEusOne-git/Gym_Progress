@@ -35,7 +35,6 @@ function coverageScore(candidate: ExerciseCandidate, focus: MusclePriority[], pr
     if (priorities.has(group)) score += 6;
     score -= (counts.get(group) ?? 0) * 2;
   }
-  // A static image keeps the workout understandable even when no video exists.
   if (candidate.hasStaticMedia) score += 1;
   if (candidate.hasVideoMedia) score += 1;
   return score;
@@ -48,13 +47,12 @@ export function generatePlan(preferences: PlanPreferences, candidates: ExerciseC
   const usedThisWeek = new Map<string, number>();
   const exercisesPerDay = preferences.experience === "BEGINNER" ? 5 : preferences.trainingDays >= 5 ? 6 : 5;
 
-  const days = split.map((splitDay, dayIndex) => {
+  const days = split.map((splitDay) => {
     const focus = [...splitDay.focus].sort((a, b) => Number(priorities.has(b)) - Number(priorities.has(a)));
     const pool = selectExercises(candidates, preferences, focus, Math.min(candidates.length, 18));
     const selected: ExerciseCandidate[] = [];
     const counts = new Map<MusclePriority, number>();
 
-    // First guarantee coverage of the day's primary muscle groups.
     for (const muscle of focus) {
       const match = pool
         .filter((candidate) => !selected.some((item) => item.id === candidate.id))
@@ -70,8 +68,6 @@ export function generatePlan(preferences: PlanPreferences, candidates: ExerciseC
       }
     }
 
-    // Fill the remaining slots while penalizing repeated muscles and repeated
-    // exercises across the week. This creates materially different sessions.
     while (selected.length < exercisesPerDay) {
       const next = pool
         .filter((candidate) => !selected.some((item) => item.id === candidate.id))

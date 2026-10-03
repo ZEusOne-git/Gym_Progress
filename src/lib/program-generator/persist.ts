@@ -48,9 +48,11 @@ export async function generateAndAssignPlan(userId: string) {
   const generated = generatePlan(preferences, candidates);
   if (generated.days.some(day => day.exercises.length < 3)) throw new Error("Non ci sono abbastanza esercizi compatibili.");
 
-  const previous = await prisma.workoutPlan.findMany({ where:{ userId, isActive:true }, select:{ id:true } });
+  const activeSession = await prisma.workoutSession.findFirst({ where:{ userId, completedAt:null }, select:{ id:true } });
+  if (activeSession) throw new Error("Completa o termina l'allenamento attivo prima di cambiare programma.");
+
   await prisma.workoutPlan.updateMany({ where:{ userId, isActive:true }, data:{ isActive:false } });
-  if (previous.length) await prisma.workoutSchedule.deleteMany({ where:{ userId, workoutPlanId:{ in:previous.map(p=>p.id) }, scheduledDate:{ gte:todayStart() } } });
+  await prisma.workoutSchedule.deleteMany({ where:{ userId, scheduledDate:{ gte:todayStart() }, session:null } });
 
   const plan = await prisma.workoutPlan.create({ data:{ userId, name:generated.name, isActive:true, isTemplate:false, templates:{ create:generated.days.map((day,i)=>({ dayNumber:i+1, name:day.name, estimatedMins:50, exercises:{ create:day.exercises.map((exercise,orderIndex)=>({ exerciseId:exercise.exerciseId, orderIndex, sets:exercise.sets, repMin:exercise.repMin, repMax:exercise.repMax, rirTarget:exercise.rir, restSeconds:exercise.restSeconds, progressionType:"DOUBLE_PROGRESSION" })) } })) } }, include:{ templates:{ orderBy:{ dayNumber:"asc" }, select:{ id:true, dayNumber:true, name:true } } } });
   await createCalendar(userId, plan.id, plan.templates.map(t=>t.id), days);

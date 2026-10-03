@@ -79,12 +79,14 @@ async function adaptTemplates(freeExercises) {
           data: { exerciseId: replacement.id, loadIncrement: null, targetWeight: null, notes: `Adattato al catalogo free: ${replacement.name}.` },
         });
       }
-      await tx.workoutPlan.update({ where: { id: plan.id }, data: { version: { increment: 1 } } });
+      await tx.workoutPlan.update({ where: { id: plan.id }, data: { version: { increment: 1 }, isActive: true } });
     });
     adaptedPlans += 1;
     adaptedExercises += replacements.length;
     console.log(`Adattato template: ${plan.name} (${replacements.length} esercizi)`);
   }
+
+  await prisma.workoutPlan.updateMany({ where: { isTemplate: true }, data: { isActive: true } });
   return { adaptedPlans, adaptedExercises };
 }
 

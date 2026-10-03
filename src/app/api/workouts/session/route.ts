@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { generateAndAssignPlan } from "@/lib/program-generator/persist";
+import { FREE_EXERCISE_SET } from "@/lib/program-generator/free-exercise-catalog";
 
 const PLAN_REGENERATION_FLAG = "planRegenerationPending";
 
@@ -13,15 +14,26 @@ function parseDate(value: unknown) {
   return date;
 }
 
+async function markPlanRegenerationPending(userId: string) {
+  const onboarding = await prisma.onboardingResponse.findUnique({ where: { userId }, select: { preferencesJson: true } });
+  let preferences: Record<string, unknown> = {};
+  try {
+    const parsed = JSON.parse(onboarding?.preferencesJson ?? "{}");
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) preferences = parsed;
+  } catch { /* rebuild below */ }
+  if (!preferences[PLAN_REGENERATION_FLAG]) {
+    preferences[PLAN_REGENERATION_FLAG] = true;
+    await prisma.onboardingResponse.update({ where: { userId }, data: { preferencesJson: JSON.stringify(preferences) } });
+  }
+}
+
 async function regeneratePendingPlan(userId: string) {
   const onboarding = await prisma.onboardingResponse.findUnique({ where: { userId }, select: { preferencesJson: true } });
   let pending = false;
   try {
     const preferences = JSON.parse(onboarding?.preferencesJson ?? "{}");
     pending = Boolean(preferences?.[PLAN_REGENERATION_FLAG]);
-  } catch {
-    pending = false;
-  }
+  } catch { pending = false; }
   if (!pending) return false;
 
   try {
@@ -30,9 +42,7 @@ async function regeneratePendingPlan(userId: string) {
     try {
       const parsed = JSON.parse(onboarding?.preferencesJson ?? "{}");
       if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) preferences = parsed;
-    } catch {
-      // Rebuild only the preferences object if legacy data is malformed.
-    }
+    } catch { /* rebuild below */ }
     delete preferences[PLAN_REGENERATION_FLAG];
     await prisma.onboardingResponse.update({ where: { userId }, data: { preferencesJson: JSON.stringify(preferences) } });
     return true;
@@ -65,26 +75,22 @@ export async function POST(request: Request) {
     const body = await request.json();
     const templateId = typeof body.templateId === "string" ? body.templateId : "";
     if (!templateId) return NextResponse.json({ error: "Workout non valido." }, { status: 400 });
-    const template = await prisma.workoutTemplate.findFirst({ where: { id: templateId, plan: { userId: user.id, isActive: true, isTemplate: false } }, select: { id: true, workoutPlanId: true } });
+    const template = await prisma.workoutTemplate.findFirst({ where: { id: templateId, plan: { userId: user.id, isActive: true, isTemplate: false } }, select: { id: true, workoutPlanId: true, exercises: { select: { exercise: { select: { slug: true } } } } } });
     if (!template) return NextResponse.json({ error: "Workout non disponibile." }, { status: 404 });
+    const hasLegacyExercises = template.exercises.some(item => !FREE_EXERCISE_SET.has(item.exercise.slug));
+    if (hasLegacyExercises) await markPlanRegenerationPending(user.id);
+
     const requestedDate = parseDate(body.date);
     const todayStart = new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate());
-
     let schedule = requestedDate
       ? await prisma.workoutSchedule.findFirst({ where: { userId: user.id, workoutPlanId: template.workoutPlanId, templateId: template.id, scheduledDate: requestedDate }, select: { id: true, scheduledDate: true } })
       : await prisma.workoutSchedule.findFirst({ where: { userId: user.id, workoutPlanId: template.workoutPlanId, templateId: template.id, scheduledDate: { gte: todayStart }, session: { is: null } }, orderBy: { scheduledDate: "asc" }, select: { id: true, scheduledDate: true } });
 
-    // Generated plans can be opened directly before their calendar rows have
-    // been materialized. If the requested day is free, materialize that exact
-    // occurrence; otherwise preserve the calendar uniqueness invariant.
     if (!schedule && requestedDate) {
       const occupiedDate = await prisma.workoutSchedule.findFirst({ where: { userId: user.id, scheduledDate: requestedDate }, select: { id: true } });
       if (!occupiedDate) {
-        try {
-          schedule = await prisma.workoutSchedule.create({ data: { userId: user.id, workoutPlanId: template.workoutPlanId, templateId: template.id, scheduledDate: requestedDate }, select: { id: true, scheduledDate: true } });
-        } catch {
-          schedule = await prisma.workoutSchedule.findFirst({ where: { userId: user.id, workoutPlanId: template.workoutPlanId, templateId: template.id, scheduledDate: requestedDate }, select: { id: true, scheduledDate: true } });
-        }
+        try { schedule = await prisma.workoutSchedule.create({ data: { userId: user.id, workoutPlanId: template.workoutPlanId, templateId: template.id, scheduledDate: requestedDate }, select: { id: true, scheduledDate: true } }); }
+        catch { schedule = await prisma.workoutSchedule.findFirst({ where: { userId: user.id, workoutPlanId: template.workoutPlanId, templateId: template.id, scheduledDate: requestedDate }, select: { id: true, scheduledDate: true } }); }
       }
     }
 
@@ -95,44 +101,29 @@ export async function POST(request: Request) {
         candidateDate.setHours(12, 0, 0, 0);
         const existing = await prisma.workoutSchedule.findFirst({ where: { userId: user.id, scheduledDate: candidateDate }, select: { id: true } });
         if (existing) continue;
-        try {
-          schedule = await prisma.workoutSchedule.create({ data: { userId: user.id, workoutPlanId: template.workoutPlanId, templateId: template.id, scheduledDate: candidateDate }, select: { id: true, scheduledDate: true } });
-        } catch {
-          // Another request may have claimed this calendar date; keep looking.
-        }
+        try { schedule = await prisma.workoutSchedule.create({ data: { userId: user.id, workoutPlanId: template.workoutPlanId, templateId: template.id, scheduledDate: candidateDate }, select: { id: true, scheduledDate: true } }); }
+        catch { /* keep looking */ }
       }
     }
-
     if (!schedule) return NextResponse.json({ error: "Questo workout non è programmato nel calendario." }, { status: 409 });
 
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async tx => {
       const open = await tx.workoutSession.findFirst({ where: { userId: user.id, completedAt: null }, orderBy: { startedAt: "desc" }, include: { schedule: { select: { id: true, templateId: true } } } });
       if (open) {
-        // Starting the same generated plan twice should be idempotent even if
-        // the calendar occurrence changed underneath the active session.
         const sameWorkout = open.workoutPlanId === template.workoutPlanId;
-        if (!sameWorkout) {
-          return { conflict: NextResponse.json({ error: "Hai già un allenamento in corso. Riprendilo o terminalo prima di iniziarne un altro." }, { status: 409 }) };
-        }
+        if (!sameWorkout) return { conflict: NextResponse.json({ error: "Hai già un allenamento in corso. Riprendilo o terminalo prima di iniziarne un altro." }, { status: 409 }) };
         if (open.pausedAt) {
           const resumed = await tx.workoutSession.update({ where: { id: open.id }, data: { startedAt: new Date(), pausedAt: null }, select: { id: true, startedAt: true, pausedAt: true, elapsedSeconds: true } });
           return { session: resumed, resumed: true };
         }
         return { session: open, resumed: false };
       }
-
       const previous = await tx.workoutSession.findUnique({ where: { scheduleId: schedule.id }, select: { id: true, completedAt: true, endedEarly: true } });
-      if (previous?.completedAt && !previous.endedEarly) {
-        return { conflict: NextResponse.json({ error: "Questo allenamento è già stato completato." }, { status: 409 }) };
-      }
-      if (previous?.completedAt && previous.endedEarly) {
-        await tx.workoutSession.update({ where: { id: previous.id }, data: { scheduleId: null } });
-      }
-
+      if (previous?.completedAt && !previous.endedEarly) return { conflict: NextResponse.json({ error: "Questo allenamento è già stato completato." }, { status: 409 }) };
+      if (previous?.completedAt && previous.endedEarly) await tx.workoutSession.update({ where: { id: previous.id }, data: { scheduleId: null } });
       const session = await tx.workoutSession.create({ data: { userId: user.id, workoutPlanId: template.workoutPlanId, scheduleId: schedule.id }, select: { id: true, startedAt: true, pausedAt: true, elapsedSeconds: true } });
       return { session, created: true };
     });
-
     if ("conflict" in result) return result.conflict;
     return NextResponse.json({ session: result.session, resumed: result.resumed ?? false, scheduledDate: schedule.scheduledDate }, { status: result.created ? 201 : 200 });
   } catch (error) {
@@ -151,7 +142,7 @@ export async function PATCH(request: Request) {
     const action = body.action ?? "complete";
     if (action !== "pause" && action !== "finish" && action !== "complete") return NextResponse.json({ error: "Azione non valida." }, { status: 400 });
     if (!sessionId) return NextResponse.json({ error: "Sessione non valida." }, { status: 400 });
-    const session = await prisma.workoutSession.findFirst({ where: { id: sessionId, userId: user.id, completedAt: null }, include: { sets: true, schedule: { include: { template: { include: { exercises: { select: { exerciseId: true, sets: true } } } } } }, plan: { select: { templates: { include: { exercises: { select: { exerciseId: true, sets: true } } } } } } } });
+    const session = await prisma.workoutSession.findFirst({ where: { id: sessionId, userId: user.id, completedAt: null }, include: { sets: true, schedule: { include: { template: { include: { exercises: { select: { exerciseId: true, sets: true, exercise: { select: { slug: true } } } } } } } }, plan: { select: { templates: { include: { exercises: { select: { exerciseId: true, sets: true, exercise: { select: { slug: true } } } } } } } } } });
     if (!session) return NextResponse.json({ error: "Sessione non trovata o già terminata." }, { status: 404 });
     if (action === "pause") {
       if (session.pausedAt) return NextResponse.json({ ok: true, paused: true, session: { id: session.id, startedAt: session.startedAt, pausedAt: session.pausedAt, elapsedSeconds: session.elapsedSeconds } });
@@ -164,23 +155,24 @@ export async function PATCH(request: Request) {
     if (action === "finish") {
       const now = new Date();
       const additionalSeconds = Math.max(0, Math.floor((now.getTime() - session.startedAt.getTime()) / 1000));
-      const finished = await prisma.workoutSession.update({ where: { id: sessionId }, data: { completedAt: now, endedEarly: true, elapsedSeconds: { increment: additionalSeconds } }, select: { id: true, completedAt: true, endedEarly: true, elapsedSeconds: true } });
+      const finished = await prisma.workoutSession.update({ where: { id: session.id }, data: { completedAt: now, endedEarly: true, elapsedSeconds: { increment: additionalSeconds } }, select: { id: true, completedAt: true, endedEarly: true, elapsedSeconds: true } });
       const planRegenerated = await regeneratePendingPlan(user.id);
       return NextResponse.json({ ok: true, finishedEarly: true, planRegenerated, session: finished });
     }
     const currentTemplate = session.schedule?.template ?? (() => {
-      const sessionExerciseIds = new Set(session.sets.map((set) => set.exerciseId));
-      return session.plan.templates.find((template) => {
-        const templateExerciseIds = new Set(template.exercises.map((item) => item.exerciseId));
-        return templateExerciseIds.size === sessionExerciseIds.size && [...templateExerciseIds].every((id) => sessionExerciseIds.has(id));
+      const sessionExerciseIds = new Set(session.sets.map(set => set.exerciseId));
+      return session.plan.templates.find(template => {
+        const freeExercises = template.exercises.filter(item => FREE_EXERCISE_SET.has(item.exercise.slug));
+        const templateExerciseIds = new Set(freeExercises.map(item => item.exerciseId));
+        return templateExerciseIds.size === sessionExerciseIds.size && [...templateExerciseIds].every(id => sessionExerciseIds.has(id)) ? { ...template, exercises: freeExercises } : null;
       }) ?? null;
     })();
     if (currentTemplate) {
       for (const item of currentTemplate.exercises) {
-        const completedSets = session.sets.filter((set) => set.exerciseId === item.exerciseId && set.completed);
+        const completedSets = session.sets.filter(set => set.exerciseId === item.exerciseId && set.completed);
         if (completedSets.length < item.sets) return NextResponse.json({ error: "Completa tutte le serie previste prima di chiudere l'allenamento." }, { status: 400 });
       }
-    } else if (!session.sets.length || session.sets.some((set) => !set.completed)) {
+    } else if (!session.sets.length || session.sets.some(set => !set.completed)) {
       return NextResponse.json({ error: "Completa tutte le serie prima di chiudere l'allenamento." }, { status: 400 });
     }
     const now = new Date();

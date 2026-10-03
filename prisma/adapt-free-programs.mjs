@@ -76,7 +76,12 @@ async function adaptTemplates(freeExercises) {
       for (const { item, replacement } of replacements) {
         await tx.workoutExercise.update({
           where: { id: item.id },
-          data: { exerciseId: replacement.id, loadIncrement: null, targetWeight: null, notes: `Adattato al catalogo free: ${replacement.name}.` },
+          data: {
+            exerciseId: replacement.id,
+            loadIncrement: null,
+            targetWeight: null,
+            notes: `Adattato al catalogo free: ${replacement.name}.`,
+          },
         });
       }
       await tx.workoutPlan.update({ where: { id: plan.id }, data: { version: { increment: 1 }, isActive: true } });
@@ -88,6 +93,15 @@ async function adaptTemplates(freeExercises) {
 
   await prisma.workoutPlan.updateMany({ where: { isTemplate: true }, data: { isActive: true } });
   return { adaptedPlans, adaptedExercises };
+}
+
+async function assertTemplatesAreFree() {
+  const remaining = await prisma.workoutExercise.findMany({
+    where: { workoutTemplate: { workoutPlan: { isTemplate: true } } },
+    select: { exercise: { select: { slug: true } } },
+  });
+  const invalid = [...new Set(remaining.map((item) => item.exercise.slug).filter((slug) => !FREE_EXERCISE_SET.has(slug)))];
+  if (invalid.length) throw new Error(`Programmi template non conformi al catalogo free: ${invalid.join(", ")}`);
 }
 
 async function assignPlansToUsers() {
@@ -164,7 +178,7 @@ async function assignPlansToUsers() {
         userId: user.id,
         workoutPlanId: plan.id,
         templateId: template.id,
-        scheduledDate: new Date(monday.getTime() + weekdays[index] * 24 * 60 * 60 * 1000),
+        scheduledDate: new Date(monday.getTime() + (weekdays[index] - 1) * 24 * 60 * 60 * 1000),
       }));
       if (rows.length) await tx.workoutSchedule.createMany({ data: rows });
     });
@@ -183,6 +197,7 @@ async function main() {
   if (freeExercises.length !== FREE_EXERCISE_SET.size) throw new Error(`Catalogo free incompleto: trovati ${freeExercises.length}/${FREE_EXERCISE_SET.size} esercizi.`);
 
   const adapted = await adaptTemplates(freeExercises);
+  await assertTemplatesAreFree();
   const assignment = await assignPlansToUsers();
   console.log(`Completato: ${adapted.adaptedPlans} programmi adattati, ${adapted.adaptedExercises} sostituzioni, ${assignment.assigned} utenti assegnati, ${assignment.skipped} utenti saltati.`);
 }

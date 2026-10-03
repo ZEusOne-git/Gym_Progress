@@ -6,7 +6,7 @@ import Image from "next/image";
 import { ArrowLeft, Check, ChevronRight, Clock3, Loader2, Play, SkipForward, Trophy } from "lucide-react";
 
 type Media = { url: string; type: string; thumbnailUrl: string | null; sourceName: string | null };
-type Exercise = { id: string; sets: number; repMin: number; repMax: number; restSeconds: number; rirTarget?: number | null; targetWeight?: number | null; exercise: { name: string; category: string; media?: Media[] } };
+type Exercise = { id: string; sets: number; repMin: number; repMax: number; restSeconds: number; rirTarget?: number | null; targetWeight?: number | null; exercise: { id: string; name: string; category: string; media?: Media[] } };
 type Data = { template: { id: string; dayNumber: number; name: string; exercises: Exercise[] }; plan: { name: string } };
 type SetLog = { id?: string; exerciseId: string; setNumber: number; weight: number; reps: number; rir: number | null; completed: boolean };
 type Progression = {
@@ -61,7 +61,11 @@ export default function ActiveWorkoutPage() {
       setElapsed(active.session.elapsedSeconds ?? 0);
       setIsPaused(Boolean(active.session.pausedAt));
       const grouped: Record<string, SetLog[]> = {};
-      for (const item of active.session.sets) (grouped[item.exerciseId] ??= []).push(item);
+      for (const item of active.session.sets) {
+        const workoutExercise = workout.template.exercises.find(exercise => exercise.exercise.id === item.exerciseId);
+        if (!workoutExercise) continue;
+        (grouped[workoutExercise.id] ??= []).push({ ...item, exerciseId: workoutExercise.id });
+      }
       setLogs(grouped);
       const firstIncomplete = workout.template.exercises.findIndex(exercise => { const sets = grouped[exercise.id] ?? []; return sets.length < exercise.sets || sets.slice(0, exercise.sets).some(set => !set.completed); });
       if (firstIncomplete >= 0) { setExerciseIndex(firstIncomplete); const nextSets = grouped[workout.template.exercises[firstIncomplete].id] ?? []; const nextSet = nextSets.findIndex(item => !item.completed); setSetIndex(nextSet >= 0 ? nextSet : 0); }

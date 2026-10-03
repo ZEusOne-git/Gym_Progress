@@ -36,14 +36,35 @@ export function isEquipmentCompatible(requirements: string[], available: string[
 
 type ExerciseEquipment = { id: string; category: string; primaryMuscles: string; equipment: string; difficulty: string };
 
+const MUSCLE_ALIASES: Record<string, string[]> = {
+  BACK: ["LATISSIMUS_DORSI", "RHOMBOIDS", "TRAPEZIUS"],
+  BICEPS: ["BICEPS_BRACHII", "BRACHIALIS"],
+  CALVES: ["GASTROCNEMIUS", "SOLEUS"],
+  CHEST: ["PECTORALIS_MAJOR", "PECTORALIS_MINOR"],
+  GLUTES: ["GLUTEUS_MAXIMUS", "GLUTEUS_MEDIUS"],
+  HAMSTRINGS: ["BICEPS_FEMORIS", "SEMITENDINOSUS", "SEMIMEMBRANOSUS"],
+  LATS: ["LATISSIMUS_DORSI"],
+  QUADS: ["QUADRICEPS"],
+  SHOULDERS: ["ANTERIOR_DELTOID", "LATERAL_DELTOID", "POSTERIOR_DELTOID"],
+  TRICEPS: ["TRICEPS_BRACHII"],
+};
+
+function muscleTokens(value: string) {
+  return value.split(/[·,;/]+/).map(token => token.trim().toUpperCase().replace(/[^A-Z0-9]+/g, "_")).filter(Boolean);
+}
+
+function sharePrimaryMuscles(source: ExerciseEquipment, candidate: ExerciseEquipment) {
+  const sourceMuscles = new Set(muscleTokens(source.primaryMuscles));
+  for (const token of [...sourceMuscles]) for (const alias of MUSCLE_ALIASES[token] ?? []) sourceMuscles.add(alias);
+  const candidateMuscles = new Set(muscleTokens(candidate.primaryMuscles));
+  for (const token of [...candidateMuscles]) for (const alias of MUSCLE_ALIASES[token] ?? []) candidateMuscles.add(alias);
+  return [...candidateMuscles].some(token => sourceMuscles.has(token));
+}
+
 export function findAlternativeExercise(source: ExerciseEquipment, catalog: ExerciseEquipment[], available: string[]) {
   return catalog.find(item =>
     item.id !== source.id &&
-    item.category === source.category &&
-    isEquipmentCompatible(parseEquipment(item.equipment), available),
-  ) ?? catalog.find(item =>
-    item.id !== source.id &&
-    (item.primaryMuscles === source.primaryMuscles || item.category === source.category) &&
+    sharePrimaryMuscles(source, item) &&
     isEquipmentCompatible(parseEquipment(item.equipment), available),
   );
 }

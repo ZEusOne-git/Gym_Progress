@@ -23,7 +23,7 @@ const monday = (date: Date) => { const day = date.getDay() || 7; return new Date
 async function createCalendar(userId: string, planId: string, templateIds: string[], days: PlanPreferences["trainingDays"]) {
   const today = dayStart(new Date());
   const firstMonday = monday(today);
-  const rows = [] as { userId:string; workoutPlanId:string; templateId:string; scheduledDate:Date }[];
+  const rows: { userId:string; workoutPlanId:string; templateId:string; scheduledDate:Date }[] = [];
   for (let week = 0; week < 8; week += 1) {
     const base = new Date(firstMonday.getFullYear(), firstMonday.getMonth(), firstMonday.getDate() + week * 7);
     trainingWeekdays[days].forEach((weekday, index) => {
@@ -31,7 +31,7 @@ async function createCalendar(userId: string, planId: string, templateIds: strin
       if (date >= today) rows.push({ userId, workoutPlanId:planId, templateId:templateIds[index], scheduledDate:date });
     });
   }
-  if (rows.length) await prisma.workoutSchedule.createMany({ data:rows, skipDuplicates:true });
+  if (rows.length) await prisma.workoutSchedule.createMany({ data:rows });
 }
 
 export async function generateAndAssignPlan(userId: string) {

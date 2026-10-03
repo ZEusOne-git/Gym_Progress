@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Check, ChevronRight, Clock3, Loader2, Play, SkipForward, Trophy } from "lucide-react";
 import { getExerciseHowTo } from "@/lib/program-generator/exercise-how-to";
+import { FREE_EXERCISE_SET } from "@/lib/program-generator/free-exercise-catalog";
 
 type ExerciseMedia = { url: string; type: string; thumbnailUrl?: string | null; sourceName?: string | null; sourceUrl?: string | null; attribution?: string | null };
 type Exercise = { id: string; sets: number; repMin: number; repMax: number; restSeconds: number; rirTarget?: number | null; targetWeight?: number | null; exercise: { id: string; name: string; slug: string; category: string; media: ExerciseMedia[] } };
@@ -154,10 +155,10 @@ export default function ActiveWorkoutPage() {
   const lastBestSet = progression?.last?.sets?.length ? progression.last.sets.reduce((best, set) => set.weight > best.weight || (set.weight === best.weight && set.reps > best.reps) ? set : best, progression.last.sets[0]) : null;
   const completedVolume = Object.values(logs).flat().filter(set => set.completed).reduce((sum, set) => sum + set.weight * set.reps, 0);
   const howTo = exercise ? getExerciseHowTo(exercise.exercise.slug) : null;
-  const animationUrl = exercise ? `/animations/${exercise.exercise.slug}.webp` : null;
   const mediaFallback = exercise?.exercise.media?.find(item => item.type === "IMAGE" || item.type === "GIF") ?? exercise?.exercise.media?.[0] ?? null;
-  const demonstrationUrl = animationUrl ? animationUrl : mediaFallback?.url ?? null;
-  const demonstrationIsLegacy = Boolean(mediaFallback && !exercise?.exercise.slug);
+  const demonstrationUrl = exercise && FREE_EXERCISE_SET.has(exercise.exercise.slug)
+    ? `/animations/${exercise.exercise.slug}.webp`
+    : mediaFallback?.url ?? null;
 
   function updateCurrent(field: "weight" | "reps" | "rir", value: string) {
     if (!exercise || !currentSet || currentSet.completed || phase !== "ready") return;

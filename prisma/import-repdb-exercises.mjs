@@ -18,6 +18,10 @@ function slugify(value) {
   return value.toUpperCase().replace(/[^A-Z0-9]+/g, "_").replace(/^_|_$/g, "");
 }
 
+function isJsonArray(value) {
+  try { return Array.isArray(JSON.parse(value)); } catch { return false; }
+}
+
 async function main() {
   const response = await fetch(dataUrl, { headers: { "User-Agent": "GymProgress-ExerciseCatalog/1.0" } });
   if (!response.ok) throw new Error(`RepDB catalog download failed (${response.status}).`);
@@ -30,6 +34,7 @@ async function main() {
   let mediaCount = 0;
   for (const item of dataset.exercises) {
     if (typeof item.id !== "string" || typeof item.name_en !== "string") continue;
+    const slug = localSlugAliases[item.id] ?? item.id;
     const equipment = list(item.equipment).map(slugify);
     if (item.is_bodyweight && !equipment.includes("BODYWEIGHT")) equipment.push("BODYWEIGHT");
     const instructions = list(item.instructions_en);
@@ -39,18 +44,22 @@ async function main() {
       : "BEGINNER";
     const primaryMuscles = list(item.primary_muscles).map(slugify);
     if (!primaryMuscles.length && item.body_part) primaryMuscles.push(slugify(String(item.body_part)));
+    const primaryMusclesJson = JSON.stringify(primaryMuscles);
+    const secondaryMusclesJson = JSON.stringify(list(item.secondary_muscles).map(slugify));
+    const equipmentJson = JSON.stringify(equipment);
 
+    const existing = await prisma.exercise.findUnique({ where: { slug }, select: { id: true, primaryMuscles: true } });
     const exercise = await prisma.exercise.upsert({
-      where: { slug: localSlugAliases[item.id] ?? item.id },
+      where: { slug },
       // Re-running the import must not overwrite exercise edits made by an admin.
-      update: {},
+      update: !existing || isJsonArray(existing.primaryMuscles) ? {} : { primaryMuscles: primaryMusclesJson, secondaryMuscles: secondaryMusclesJson, equipment: equipmentJson },
       create: {
         name: item.name_en,
-        slug: localSlugAliases[item.id] ?? item.id,
+        slug,
         category: String(item.category ?? "STRENGTH").toUpperCase(),
-        primaryMuscles: JSON.stringify(primaryMuscles),
-        secondaryMuscles: JSON.stringify(list(item.secondary_muscles).map(slugify)),
-        equipment: JSON.stringify(equipment),
+        primaryMuscles: primaryMusclesJson,
+        secondaryMuscles: secondaryMusclesJson,
+        equipment: equipmentJson,
         difficulty,
         instructionsJson: JSON.stringify(instructions),
         cuesJson: JSON.stringify(tips),
@@ -63,8 +72,8 @@ async function main() {
     const imagePaths = [...new Set([poses.start, poses.peak, poses.main].filter(path => typeof path === "string" && path.startsWith("images/")))];
     for (const imagePath of imagePaths) {
       const url = new URL(imagePath, imageBase).toString();
-      const existing = await prisma.exerciseMedia.findFirst({ where: { exerciseId: exercise.id, sourceName: "RepDB", url }, select: { id: true } });
-      if (existing) continue;
+      const existingMedia = await prisma.exerciseMedia.findFirst({ where: { exerciseId: exercise.id, sourceName: "RepDB", url }, select: { id: true } });
+      if (existingMedia) continue;
       const hasCustomPrimary = await prisma.exerciseMedia.findFirst({ where: { exerciseId: exercise.id, isPrimary: true, sourceName: { not: "RepDB" } }, select: { id: true } });
       const hasAnyPrimary = hasCustomPrimary || await prisma.exerciseMedia.findFirst({ where: { exerciseId: exercise.id, isPrimary: true }, select: { id: true } });
       await prisma.exerciseMedia.create({

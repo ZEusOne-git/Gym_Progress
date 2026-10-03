@@ -64,7 +64,14 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const templateId = url.searchParams.get("template");
   const scheduledDate = parseDate(url.searchParams.get("date"));
-  if (!templateId) return NextResponse.json({ session: null });
+  if (!templateId) {
+    const active = await prisma.workoutSession.findFirst({
+      where: { userId: user.id, completedAt: null },
+      orderBy: { startedAt: "desc" },
+      select: { id: true, startedAt: true, pausedAt: true, elapsedSeconds: true, schedule: { select: { templateId: true, scheduledDate: true } } },
+    });
+    return NextResponse.json({ session: active });
+  }
   const schedule = scheduledDate
     ? await prisma.workoutSchedule.findFirst({ where: { userId: user.id, templateId, scheduledDate: dayRange(scheduledDate) }, select: { id: true } })
     : null;
@@ -112,10 +119,19 @@ export async function POST(request: Request) {
     if (!schedule) return NextResponse.json({ error: "Questo workout non è programmato nel calendario." }, { status: 409 });
 
     const result = await prisma.$transaction(async tx => {
-      const open = await tx.workoutSession.findFirst({ where: { userId: user.id, completedAt: null }, orderBy: { startedAt: "desc" }, include: { schedule: { select: { id: true, templateId: true } } } });
+      const open = await tx.workoutSession.findFirst({ where: { userId: user.id, completedAt: null }, orderBy: { startedAt: "desc" }, include: { schedule: { select: { id: true, templateId: true, scheduledDate: true } } } });
       if (open) {
-        const sameWorkout = open.workoutPlanId === template.workoutPlanId;
-        if (!sameWorkout) return { conflict: NextResponse.json({ error: "Hai già un allenamento in corso. Riprendilo o terminalo prima di iniziarne un altro." }, { status: 409 }) };
+        const sameWorkout = open.schedule?.templateId === template.id;
+        if (!sameWorkout) {
+          return {
+            conflict: NextResponse.json({
+              error: "Hai già un allenamento in corso. Riprendilo prima di iniziarne un altro.",
+              activeSessionId: open.id,
+              activeTemplateId: open.schedule?.templateId ?? null,
+              activeScheduledDate: open.schedule?.scheduledDate?.toISOString().slice(0, 10) ?? null,
+            }, { status: 409 }),
+          };
+        }
         if (open.pausedAt) {
           const resumed = await tx.workoutSession.update({ where: { id: open.id }, data: { startedAt: new Date(), pausedAt: null }, select: { id: true, startedAt: true, pausedAt: true, elapsedSeconds: true } });
           return { session: resumed, resumed: true };

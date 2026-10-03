@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { findAlternativeExercise, isEquipmentCompatible, parseEquipment } from "@/lib/equipment";
+import type { Prisma } from "@prisma/client";
 
 function weekdaysFor(count: number) {
   const presets: Record<number, number[]> = {
@@ -34,7 +35,7 @@ const generatedTemplateSelect = {
   estimatedMins: true,
   _count: { select: { exercises: true } },
   exercises: {
-    orderBy: { orderIndex: "asc" as const },
+    orderBy: { orderIndex: "asc" },
     select: {
       exercise: {
         select: {
@@ -44,7 +45,7 @@ const generatedTemplateSelect = {
           equipment: true,
           media: {
             where: { isActive: true },
-            orderBy: [{ isPrimary: "desc" as const }, { createdAt: "asc" as const }],
+            orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }],
             select: { type: true, url: true, thumbnailUrl: true, sourceName: true, sourceUrl: true, attribution: true },
           },
         },
@@ -57,7 +58,7 @@ const generatedTemplateSelect = {
       notes: true,
     },
   },
-} as const;
+} satisfies Prisma.WorkoutTemplateSelect;
 
 export async function GET() {
   const user = await getCurrentUser();
@@ -160,7 +161,7 @@ export async function POST(request: Request) {
       include: { templates: { orderBy: { dayNumber: "asc" } } },
     });
 
-    const rows = plan.templates.map((template, index) => ({ userId: user.id, planId: plan.id, templateId: template.id, scheduledDate: new Date(monday.getTime() + weekdays[index] * 24 * 60 * 60 * 1000), dayNumber: template.dayNumber }));
+    const rows = plan.templates.map((template, index) => ({ userId: user.id, workoutPlanId: plan.id, templateId: template.id, scheduledDate: new Date(monday.getTime() + weekdays[index] * 24 * 60 * 60 * 1000), dayNumber: template.dayNumber }));
     if (rows.length) await tx.workoutSchedule.createMany({ data: rows });
     return plan;
   });

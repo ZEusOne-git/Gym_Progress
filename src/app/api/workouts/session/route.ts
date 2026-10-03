@@ -35,7 +35,6 @@ async function regeneratePendingPlan(userId: string) {
     pending = Boolean(preferences?.[PLAN_REGENERATION_FLAG]);
   } catch { pending = false; }
   if (!pending) return false;
-
   try {
     await generateAndAssignPlan(userId);
     let preferences: Record<string, unknown> = {};
@@ -77,15 +76,13 @@ export async function POST(request: Request) {
     if (!templateId) return NextResponse.json({ error: "Workout non valido." }, { status: 400 });
     const template = await prisma.workoutTemplate.findFirst({ where: { id: templateId, plan: { userId: user.id, isActive: true, isTemplate: false } }, select: { id: true, workoutPlanId: true, exercises: { select: { exercise: { select: { slug: true } } } } } });
     if (!template) return NextResponse.json({ error: "Workout non disponibile." }, { status: 404 });
-    const hasLegacyExercises = template.exercises.some(item => !FREE_EXERCISE_SET.has(item.exercise.slug));
-    if (hasLegacyExercises) await markPlanRegenerationPending(user.id);
+    if (template.exercises.some(item => !FREE_EXERCISE_SET.has(item.exercise.slug))) await markPlanRegenerationPending(user.id);
 
     const requestedDate = parseDate(body.date);
     const todayStart = new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate());
     let schedule = requestedDate
       ? await prisma.workoutSchedule.findFirst({ where: { userId: user.id, workoutPlanId: template.workoutPlanId, templateId: template.id, scheduledDate: requestedDate }, select: { id: true, scheduledDate: true } })
       : await prisma.workoutSchedule.findFirst({ where: { userId: user.id, workoutPlanId: template.workoutPlanId, templateId: template.id, scheduledDate: { gte: todayStart }, session: { is: null } }, orderBy: { scheduledDate: "asc" }, select: { id: true, scheduledDate: true } });
-
     if (!schedule && requestedDate) {
       const occupiedDate = await prisma.workoutSchedule.findFirst({ where: { userId: user.id, scheduledDate: requestedDate }, select: { id: true } });
       if (!occupiedDate) {
@@ -93,7 +90,6 @@ export async function POST(request: Request) {
         catch { schedule = await prisma.workoutSchedule.findFirst({ where: { userId: user.id, workoutPlanId: template.workoutPlanId, templateId: template.id, scheduledDate: requestedDate }, select: { id: true, scheduledDate: true } }); }
       }
     }
-
     if (!schedule && !requestedDate) {
       for (let offset = 0; offset < 84 && !schedule; offset += 1) {
         const candidateDate = new Date(todayStart);
@@ -142,7 +138,7 @@ export async function PATCH(request: Request) {
     const action = body.action ?? "complete";
     if (action !== "pause" && action !== "finish" && action !== "complete") return NextResponse.json({ error: "Azione non valida." }, { status: 400 });
     if (!sessionId) return NextResponse.json({ error: "Sessione non valida." }, { status: 400 });
-    const session = await prisma.workoutSession.findFirst({ where: { id: sessionId, userId: user.id, completedAt: null }, include: { sets: true, schedule: { include: { template: { include: { exercises: { select: { exerciseId: true, sets: true, exercise: { select: { slug: true } } } } } } } }, plan: { select: { templates: { include: { exercises: { select: { exerciseId: true, sets: true, exercise: { select: { slug: true } } } } } } } } } });
+    const session = await prisma.workoutSession.findFirst({ where: { id: sessionId, userId: user.id, completedAt: null }, include: { sets: true, schedule: { include: { template: { include: { exercises: { where: { exercise: { slug: { in: [...FREE_EXERCISE_SET] } } }, select: { exerciseId: true, sets: true, exercise: { select: { slug: true } } } } } } } }, plan: { select: { templates: { include: { exercises: { where: { exercise: { slug: { in: [...FREE_EXERCISE_SET] } } }, select: { exerciseId: true, sets: true, exercise: { select: { slug: true } } } } } } } } } });
     if (!session) return NextResponse.json({ error: "Sessione non trovata o già terminata." }, { status: 404 });
     if (action === "pause") {
       if (session.pausedAt) return NextResponse.json({ ok: true, paused: true, session: { id: session.id, startedAt: session.startedAt, pausedAt: session.pausedAt, elapsedSeconds: session.elapsedSeconds } });
@@ -162,9 +158,8 @@ export async function PATCH(request: Request) {
     const currentTemplate = session.schedule?.template ?? (() => {
       const sessionExerciseIds = new Set(session.sets.map(set => set.exerciseId));
       return session.plan.templates.find(template => {
-        const freeExercises = template.exercises.filter(item => FREE_EXERCISE_SET.has(item.exercise.slug));
-        const templateExerciseIds = new Set(freeExercises.map(item => item.exerciseId));
-        return templateExerciseIds.size === sessionExerciseIds.size && [...templateExerciseIds].every(id => sessionExerciseIds.has(id)) ? { ...template, exercises: freeExercises } : null;
+        const templateExerciseIds = new Set(template.exercises.map(item => item.exerciseId));
+        return templateExerciseIds.size === sessionExerciseIds.size && [...templateExerciseIds].every(id => sessionExerciseIds.has(id)) ? template : null;
       }) ?? null;
     })();
     if (currentTemplate) {

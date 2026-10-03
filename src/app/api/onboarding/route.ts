@@ -21,6 +21,7 @@ const MUSCLE_MAP: Record<string, string> = {
   Calves: "CALVES",
   "Lower back": "LOWER_BACK",
 };
+const ALLOWED_EQUIPMENT = ["machines", "barbells", "free_weights", "cardio"] as const;
 
 function numberOrNull(value: unknown) {
   if (value === "" || value === null || value === undefined) return null;
@@ -61,6 +62,12 @@ export async function PUT(request: Request) {
   const trainingDays = numberOrNull(form.days);
   const goal = typeof form.goal === "string" ? GOAL_MAP[form.goal] : undefined;
   const priorities = Array.isArray(form.priorities) ? form.priorities.filter((item): item is string => typeof item === "string") : [];
+  const equipment = Array.isArray(form.equipment)
+    ? [...new Set(form.equipment.filter((item): item is (typeof ALLOWED_EQUIPMENT)[number] =>
+        typeof item === "string" && ALLOWED_EQUIPMENT.includes(item as (typeof ALLOWED_EQUIPMENT)[number])
+      ))]
+    : [...ALLOWED_EQUIPMENT];
+  const environment = equipment.length === ALLOWED_EQUIPMENT.length ? "COMMERCIAL_GYM" : "CUSTOM";
 
   const profile = await prisma.profile.upsert({
     where: { userId: user.id },
@@ -87,8 +94,8 @@ export async function PUT(request: Request) {
     where: { userId: user.id },
     update: {
       ...(goal ? { primaryGoal: goal } : {}),
-      environment: "COMMERCIAL_GYM",
-      equipmentJson: JSON.stringify(["machines", "barbells", "free_weights", "cardio"]),
+      environment,
+      equipmentJson: JSON.stringify(equipment),
       preferencesJson: JSON.stringify({ cardio: form.running ?? null, trainingStyle: form.notes ?? null }),
       limitationsJson: JSON.stringify({}),
       musclePrioritiesJson: JSON.stringify(priorities.map((item) => MUSCLE_MAP[item] ?? item)),
@@ -97,8 +104,8 @@ export async function PUT(request: Request) {
     create: {
       userId: user.id,
       primaryGoal: goal,
-      environment: "COMMERCIAL_GYM",
-      equipmentJson: JSON.stringify(["machines", "barbells", "free_weights", "cardio"]),
+      environment,
+      equipmentJson: JSON.stringify(equipment),
       preferencesJson: JSON.stringify({ cardio: form.running ?? null, trainingStyle: form.notes ?? null }),
       limitationsJson: JSON.stringify({}),
       musclePrioritiesJson: JSON.stringify(priorities.map((item) => MUSCLE_MAP[item] ?? item)),

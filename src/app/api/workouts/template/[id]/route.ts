@@ -40,7 +40,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   });
   if (!template) return NextResponse.json({ error: "Workout non trovato." }, { status: 404 });
 
-  const invalid = await prisma.workoutTemplateExercise.findFirst({
+  const invalid = await prisma.workoutExercise.findFirst({
     where: { templateId: template.id, exercise: { slug: { notIn: [...FREE_EXERCISE_SET] } } },
     select: { exercise: { select: { name: true } } },
   });

@@ -56,7 +56,20 @@ export async function generateAndAssignPlan(userId: string) {
     const activePlanIds = activePlans.map((plan) => plan.id);
     if (activePlanIds.length) {
       await tx.workoutPlan.updateMany({ where: { id: { in: activePlanIds } }, data: { isActive: false } });
-      await tx.workoutSchedule.deleteMany({ where: { userId, workoutPlanId: { in: activePlanIds }, scheduledDate: { gte: today }, session: { is: null } } });
+
+      // A regeneration owns the future calendar of the replaced plan. Detach
+      // any already-recorded session before deleting those occurrences so the
+      // new plan can reuse the dates without losing workout history or hitting
+      // the unique(userId, scheduledDate) constraint.
+      const futureSchedules = await tx.workoutSchedule.findMany({
+        where: { userId, workoutPlanId: { in: activePlanIds }, scheduledDate: { gte: today } },
+        select: { id: true },
+      });
+      const futureScheduleIds = futureSchedules.map((schedule) => schedule.id);
+      if (futureScheduleIds.length) {
+        await tx.workoutSession.updateMany({ where: { scheduleId: { in: futureScheduleIds } }, data: { scheduleId: null } });
+        await tx.workoutSchedule.deleteMany({ where: { id: { in: futureScheduleIds } } });
+      }
     }
     const plan = await tx.workoutPlan.create({
       data: { userId, name: generated.name, version: nextVersion, isActive: true, isTemplate: false, templates: { create: generated.days.map((day, i) => ({ dayNumber: i + 1, name: day.name, estimatedMins: preferences.sessionMinutes, exercises: { create: day.exercises.map((exercise, orderIndex) => ({ exerciseId: exercise.exerciseId, orderIndex, sets: exercise.sets, repMin: exercise.repMin, repMax: exercise.repMax, rirTarget: exercise.rir, restSeconds: exercise.restSeconds, progressionType: "DOUBLE_PROGRESSION" })) } })) } },

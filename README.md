@@ -43,11 +43,12 @@ Admin
 ```bash
 npm install
 cp .env.example .env
-npx prisma generate
-npx prisma db push
+npm run db:migrate -- --name init
 npm run db:seed
 npm run dev
 ```
+
+The local SQLite file is `prisma/dev.db` and is ignored by Git. The SQL migration history in `prisma/migrations/` is committed. Whenever `prisma/schema.prisma` changes, create and apply a migration with `npm run db:migrate -- --name describe_change`; use `npm run db:deploy` to apply committed migrations in production. Check migration state with `npm run db:status`.
 
 `db:seed` imports the RepDB free-tier exercise catalog and its static WebP pose illustrations for use inside this app. It requires network access during seeding. RepDB requires visible attribution. The free dataset does not include production-licensed animated GIFs; its paid-tier preview animations must not be used in production.
 

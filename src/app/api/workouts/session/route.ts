@@ -77,9 +77,11 @@ export async function PATCH(request: Request) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Non autorizzato" }, { status: 401 });
   try {
-    const body = await request.json();
+    const body = await request.json().catch(() => null);
+    if (!body || typeof body !== "object" || Array.isArray(body)) return NextResponse.json({ error: "Richiesta non valida." }, { status: 400 });
     const sessionId = typeof body.sessionId === "string" ? body.sessionId : "";
-    const action = body.action === "pause" ? "pause" : body.action === "finish" ? "finish" : "complete";
+    const action = body.action ?? "complete";
+    if (action !== "pause" && action !== "finish" && action !== "complete") return NextResponse.json({ error: "Azione non valida." }, { status: 400 });
     if (!sessionId) return NextResponse.json({ error: "Sessione non valida." }, { status: 400 });
     const session = await prisma.workoutSession.findFirst({ where: { id: sessionId, userId: user.id, completedAt: null }, include: { sets: true, schedule: { include: { template: { include: { exercises: { select: { exerciseId: true, sets: true } } } } } }, plan: { select: { templates: { include: { exercises: { select: { exerciseId: true, sets: true } } } } } } } });
     if (!session) return NextResponse.json({ error: "Sessione non trovata." }, { status: 404 });

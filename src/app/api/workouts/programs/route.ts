@@ -162,7 +162,13 @@ export async function POST(request: Request) {
       include: { templates: { orderBy: { dayNumber: "asc" } } },
     });
 
-    const rows = plan.templates.map((template, index) => ({ userId: user.id, workoutPlanId: plan.id, templateId: template.id, scheduledDate: new Date(monday.getTime() + weekdays[index] * 24 * 60 * 60 * 1000), dayNumber: template.dayNumber }));
+    const rows = plan.templates.map((template, index) => ({
+      userId: user.id,
+      workoutPlanId: plan.id,
+      templateId: template.id,
+      scheduledDate: new Date(monday.getTime() + (weekdays[index] - 1) * 24 * 60 * 60 * 1000),
+      dayNumber: template.dayNumber,
+    }));
     if (rows.length) await tx.workoutSchedule.createMany({ data: rows });
     return plan;
   });

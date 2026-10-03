@@ -66,7 +66,7 @@ export async function generateAndAssignPlan(userId: string) {
     goal: goal(onboarding.primaryGoal),
     equipment: parse(onboarding.equipmentJson),
     priorities: muscles(parse(onboarding.musclePrioritiesJson)),
-    sessionMinutes: profile.sessionMinutes,
+    sessionMinutes: profile.sessionMinutes ?? undefined,
   });
 
   const rows = await prisma.exercise.findMany({

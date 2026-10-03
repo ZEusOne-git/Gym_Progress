@@ -44,7 +44,7 @@ const generatedTemplateSelect = {
           equipment: true,
           media: {
             where: { isActive: true },
-            orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }],
+            orderBy: [{ isPrimary: "desc" as const }, { createdAt: "asc" as const }],
             select: { type: true, url: true, thumbnailUrl: true, sourceName: true, sourceUrl: true, attribution: true },
           },
         },
@@ -57,7 +57,7 @@ const generatedTemplateSelect = {
       notes: true,
     },
   },
-};
+} as const;
 
 export async function GET() {
   const user = await getCurrentUser();
@@ -160,19 +160,11 @@ export async function POST(request: Request) {
       include: { templates: { orderBy: { dayNumber: "asc" } } },
     });
 
-    const schedules: { userId: string; workoutPlanId: string; templateId: string; scheduledDate: Date }[] = [];
-    for (let week = 0; week < 12; week++) {
-      for (let index = 0; index < plan.templates.length; index++) {
-        const scheduledDate = new Date(monday);
-        scheduledDate.setDate(monday.getDate() + week * 7 + (weekdays[index] - 1));
-        scheduledDate.setHours(12, 0, 0, 0);
-        schedules.push({ userId: user.id, workoutPlanId: plan.id, templateId: plan.templates[index].id, scheduledDate });
-      }
-    }
-    await tx.workoutSchedule.createMany({ data: schedules });
+    const rows = plan.templates.map((template, index) => ({ userId: user.id, planId: plan.id, templateId: template.id, scheduledDate: new Date(monday.getTime() + weekdays[index] * 24 * 60 * 60 * 1000), dayNumber: template.dayNumber }));
+    if (rows.length) await tx.workoutSchedule.createMany({ data: rows });
     return plan;
   });
 
-  if (!result) return NextResponse.json({ error: "Riprendi e completa o termina l'allenamento in corso prima di cambiare programma." }, { status: 409 });
-  return NextResponse.json({ plan: result, recurrence: { weeks: 12, weekdays }, adapted: { count: adaptations.length, applied: adaptations.length > 0 } }, { status: 201 });
+  if (!result) return NextResponse.json({ error: "Completa prima l'allenamento attivo." }, { status: 409 });
+  return NextResponse.json({ plan: result, adaptations });
 }

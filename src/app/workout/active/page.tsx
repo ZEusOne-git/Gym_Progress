@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Check, ChevronRight, Clock3, Loader2, Play, SkipForward, Trophy } from "lucide-react";
+import { ArrowLeft, Check, ChevronRight, Clock3, Loader2, Play, SkipForward, Trophy, X } from "lucide-react";
 import { getExerciseHowTo } from "@/lib/program-generator/exercise-how-to";
 import { FREE_EXERCISE_SET } from "@/lib/program-generator/free-exercise-catalog";
 
@@ -39,6 +39,7 @@ export default function ActiveWorkoutPage() {
   const [finished, setFinished] = useState(false);
   const [summary, setSummary] = useState<Summary | null>(null);
   const [showExitPrompt, setShowExitPrompt] = useState(false);
+  const [showHowTo, setShowHowTo] = useState(false);
   const pauseInFlightRef = useRef(false);
 
   const query = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
@@ -136,6 +137,13 @@ export default function ActiveWorkoutPage() {
     return () => { cancelled = true; };
   }, [data, templateId]);
 
+  useEffect(() => {
+    if (!showHowTo) return;
+    const onKeyDown = (event: KeyboardEvent) => { if (event.key === "Escape") setShowHowTo(false); };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [showHowTo]);
+
   const exercise = data?.template.exercises[exerciseIndex] ?? null;
   const exerciseLogs = useMemo(() => {
     if (!exercise) return [];
@@ -155,10 +163,7 @@ export default function ActiveWorkoutPage() {
   const lastBestSet = progression?.last?.sets?.length ? progression.last.sets.reduce((best, set) => set.weight > best.weight || (set.weight === best.weight && set.reps > best.reps) ? set : best, progression.last.sets[0]) : null;
   const completedVolume = Object.values(logs).flat().filter(set => set.completed).reduce((sum, set) => sum + set.weight * set.reps, 0);
   const howTo = exercise ? getExerciseHowTo(exercise.exercise.slug) : null;
-  const mediaFallback = exercise?.exercise.media?.find(item => item.type === "IMAGE" || item.type === "GIF") ?? exercise?.exercise.media?.[0] ?? null;
-  const demonstrationUrl = exercise && FREE_EXERCISE_SET.has(exercise.exercise.slug)
-    ? `/animations/${exercise.exercise.slug}.webp`
-    : mediaFallback?.url ?? null;
+  const demonstrationUrl = exercise && FREE_EXERCISE_SET.has(exercise.exercise.slug) ? `/animations/${exercise.exercise.slug}.webp` : null;
 
   function updateCurrent(field: "weight" | "reps" | "rir", value: string) {
     if (!exercise || !currentSet || currentSet.completed || phase !== "ready") return;
@@ -175,7 +180,7 @@ export default function ActiveWorkoutPage() {
       if (!response.ok) {
         if (response.status === 409 && json?.error?.includes("allenamento in corso")) {
           const active = await fetch(`/api/workouts/session?template=${templateId}${scheduledDate ? `&date=${encodeURIComponent(scheduledDate)}` : ""}`).then(result => result.json());
-          if (active.session) { setSessionId(active.session.id); setStartedAt(active.session.startedAt); setStoredElapsed(active.session.elapsedSeconds ?? 0); setElapsed(active.session.elapsedSeconds ?? 0); setIsPaused(Boolean(active.session.pausedAt)); setError(""); return; }
+          if (active.session?.schedule?.templateId === templateId) { setSessionId(active.session.id); setStartedAt(active.session.startedAt); setStoredElapsed(active.session.elapsedSeconds ?? 0); setElapsed(active.session.elapsedSeconds ?? 0); setIsPaused(Boolean(active.session.pausedAt)); setError(""); return; }
         }
         throw new Error(json.error || "Impossibile avviare l'allenamento.");
       }
@@ -226,7 +231,7 @@ export default function ActiveWorkoutPage() {
   return <main className="relative h-[100dvh] min-h-[620px] overflow-hidden bg-black text-white">
     <div className="absolute inset-0">
       <div className="absolute inset-0 flex items-center justify-center bg-[#09110f]">
-        {demonstrationUrl ? <img src={demonstrationUrl} alt={`Dimostrazione di ${exercise.exercise.name}`} className="h-full w-full object-contain" /> : <div className="flex h-full w-full items-center justify-center text-center text-white/50"><div><div className="text-4xl">▶</div><p className="mt-3 text-xs font-semibold">Nessuna dimostrazione disponibile</p></div></div>}
+        {demonstrationUrl ? <img src={demonstrationUrl} alt={`Dimostrazione di ${exercise.exercise.name}`} className="h-full w-full object-contain" /> : <div className="flex h-full w-full items-center justify-center text-center text-white/50"><div><div className="text-4xl">▶</div><p className="mt-3 text-xs font-semibold">Nessuna animazione free disponibile per questo esercizio.</p></div></div>}
       </div>
       <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/10 to-black/95" />
     </div>
@@ -241,7 +246,7 @@ export default function ActiveWorkoutPage() {
           <h1 className="mt-1 text-[clamp(2.4rem,10vw,4.8rem)] font-black leading-[.9] tracking-[-0.06em]">{exercise.exercise.name}</h1>
           <p className="mt-2 text-xs font-semibold text-white/60">{exercise.repMin}–{exercise.repMax} reps · {exercise.restSeconds}s recupero · {exercise.exercise.category}</p>
 
-          {howTo && <section className="mt-4 rounded-2xl border border-white/10 bg-white/[0.06] p-4"><div className="flex items-center justify-between gap-3"><p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--accent)]">COME SI FA</p><span className="rounded-full bg-[var(--accent)]/10 px-2.5 py-1 text-[8px] font-black uppercase tracking-widest text-[var(--accent)]">GUIDA</span></div><div className="mt-3 space-y-2.5 text-[11px] leading-5 text-white/75"><p><strong className="text-white">Posizione:</strong> {howTo.setup}</p><p><strong className="text-white">Esecuzione:</strong> {howTo.execution}</p><p><strong className="text-white">Respirazione:</strong> {howTo.breathing}</p><p><strong className="text-white">Focus:</strong> {howTo.cue}</p></div></section>}
+          {howTo && <button type="button" onClick={() => setShowHowTo(true)} className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-full border border-white/15 bg-white/[0.07] px-4 text-[10px] font-black uppercase tracking-[0.18em] text-white transition hover:bg-white/10">COME SI FA</button>}
 
           {phase === "rest" ? <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.06] p-4"><div className="flex items-center justify-between"><div><p className="text-[9px] font-black uppercase tracking-[0.2em] text-[var(--accent)]">RECUPERO</p><p className="mt-1 text-xs font-semibold text-white/55">Preparati alla prossima serie</p></div><p className="text-4xl font-black tabular-nums">{formatTime(timer)}</p></div><button type="button" onClick={() => { setTimer(0); setPhase("ready"); }} className="mt-3 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-full border border-white/15 bg-white/10 text-[10px] font-black">SALTA RECUPERO <SkipForward size={14}/></button></div> : <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.06] p-4"><div className="grid grid-cols-2 gap-3"><label className="rounded-xl bg-black/25 p-3 text-[9px] font-black uppercase tracking-[0.16em] text-white/45">Carico<input type="number" min="0" step="0.5" value={currentSet?.weight ?? 0} disabled={!currentSet || currentSet.completed || phase !== "ready"} onChange={event => updateCurrent("weight", event.target.value)} className="mt-1 w-full bg-transparent text-3xl font-black text-white outline-none"/><span className="text-[10px] normal-case tracking-normal text-white/40">kg</span></label><label className="rounded-xl bg-black/25 p-3 text-[9px] font-black uppercase tracking-[0.16em] text-white/45">Ripetizioni<input type="number" min="0" value={currentSet?.reps ?? exercise.repMin} disabled={!currentSet || currentSet.completed || phase !== "ready"} onChange={event => updateCurrent("reps", event.target.value)} className="mt-1 w-full bg-transparent text-3xl font-black text-white outline-none"/><span className="text-[10px] normal-case tracking-normal text-white/40">reps</span></label></div>{progression && <div className="mt-3 rounded-xl border border-white/10 bg-black/20 px-3 py-2.5"><p className="text-[8px] font-black uppercase tracking-[0.16em] text-white/40">ULTIMA VOLTA</p><p className="mt-1 text-sm font-black">{lastBestSet ? `${lastBestSet.weight} kg × ${lastBestSet.reps}` : "Prima sessione"}</p><p className="mt-1 text-[10px] text-white/50">Oggi: {progression.recommendation.weight} kg × {progression.recommendation.reps}</p></div>}<div className="mt-4 flex gap-1.5">{exerciseLogs.map((item, index) => <span key={item.setNumber} className={`h-1.5 flex-1 rounded-full ${item.completed ? "bg-[var(--accent)]" : index === setIndex ? "bg-white" : "bg-white/15"}`}/>)}</div></div>}
 
@@ -250,6 +255,8 @@ export default function ActiveWorkoutPage() {
         </div>
       </div>
     </div>
+
+    {showHowTo && howTo && <div className="absolute inset-0 z-50 grid place-items-center bg-black/80 p-5 backdrop-blur-md" role="dialog" aria-modal="true" aria-label={`Come si fa ${exercise.exercise.name}`}><div className="max-h-[85dvh] w-full max-w-lg overflow-y-auto rounded-[2rem] border border-white/10 bg-[#0b0f0e] p-6 shadow-2xl"><div className="flex items-start justify-between gap-4"><div><p className="text-[9px] font-black uppercase tracking-[0.28em] text-[var(--accent)]">COME SI FA</p><h2 className="mt-2 text-3xl font-black">{exercise.exercise.name}</h2></div><button type="button" onClick={() => setShowHowTo(false)} className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/80" aria-label="Chiudi spiegazione"><X size={18}/></button></div><div className="mt-6 space-y-4 text-sm leading-6 text-white/75"><div><p className="text-[9px] font-black uppercase tracking-[0.2em] text-[var(--accent)]">Posizione</p><p className="mt-1">{howTo.setup}</p></div><div><p className="text-[9px] font-black uppercase tracking-[0.2em] text-[var(--accent)]">Esecuzione</p><p className="mt-1">{howTo.execution}</p></div><div><p className="text-[9px] font-black uppercase tracking-[0.2em] text-[var(--accent)]">Respirazione</p><p className="mt-1">{howTo.breathing}</p></div><div><p className="text-[9px] font-black uppercase tracking-[0.2em] text-[var(--accent)]">Focus</p><p className="mt-1">{howTo.cue}</p></div></div><button type="button" onClick={() => setShowHowTo(false)} className="mt-7 inline-flex min-h-12 w-full items-center justify-center rounded-full bg-[var(--accent)] px-5 text-sm font-black text-[var(--accent-foreground)]">CHIUDI</button></div></div>}
 
     {showExitPrompt && <div className="absolute inset-0 z-40 grid place-items-center bg-black/75 p-5 backdrop-blur-md"><div className="w-full max-w-sm rounded-[2rem] border border-white/10 bg-[#0b0f0e] p-6 shadow-2xl"><div className="flex items-start justify-between"><div><p className="text-[9px] font-black uppercase tracking-[0.28em] text-[var(--accent)]">USCITA</p><h2 className="mt-2 text-3xl font-black">Mettere in pausa?</h2><p className="mt-2 text-sm leading-6 text-white/55">Puoi riprendere dal punto esatto in cui sei arrivato.</p></div><button type="button" onClick={() => setShowExitPrompt(false)} className="h-9 w-9 rounded-full border border-white/10 text-white/70">×</button></div><div className="mt-6 grid gap-3"><button type="button" disabled={saving} onClick={async () => { setSaving(true); const paused = await pauseWorkout(); if (paused) window.location.href = "/calendar"; else setSaving(false); }} className="rounded-2xl border border-white/10 bg-white/5 px-4 py-4 text-left"><p className="text-sm font-black">Metti in pausa e torna al calendario</p><p className="mt-1 text-xs text-white/50">La sessione rimane salvata.</p></button><button type="button" disabled={saving} onClick={finishEarly} className="rounded-2xl bg-[var(--accent)] px-4 py-4 text-left text-[var(--accent-foreground)]"><p className="text-sm font-black">Termina allenamento</p><p className="mt-1 text-xs opacity-70">Chiudi ora mantenendo le serie registrate.</p></button></div></div></div>}
     {isPaused && <div className="absolute inset-0 z-40 grid place-items-center bg-black/80 p-6 backdrop-blur-md"><div className="w-full max-w-sm text-center"><Clock3 className="mx-auto text-[var(--accent)]" size={38}/><p className="mt-5 text-[10px] font-black uppercase tracking-[0.28em] text-[var(--accent)]">ALLENAMENTO IN PAUSA</p><h2 className="mt-2 text-4xl font-black">Tempo fermato.</h2><button type="button" onClick={startWorkout} disabled={saving} className="mt-7 inline-flex min-h-14 w-full items-center justify-center rounded-full bg-[var(--accent)] px-6 text-sm font-black text-[var(--accent-foreground)]">{saving ? "RIPRESA..." : "RIPRENDI ALLENAMENTO"}<ChevronRight size={18} className="ml-2"/></button></div></div>}

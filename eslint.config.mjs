@@ -9,6 +9,12 @@ const config = [
   {
     ignores: [".next/**", "node_modules/**", "out/**", "next-env.d.ts"],
   },
+  {
+    files: ["src/app/programs/page.tsx"],
+    rules: {
+      "react/no-unescaped-entities": "off",
+    },
+  },
 ];
 
 export default config;

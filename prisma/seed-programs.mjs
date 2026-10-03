@@ -43,6 +43,27 @@ const programs = [
       { name: "Gambe", estimatedMins: 60, exercises: [entry("barbell-squat", 4, 6, 10, 150), entry("romanian-deadlift", 3, 8, 10, 120), entry("leg-press", 3, 8, 12, 120), entry("leg-curl", 3, 10, 15, 75), entry("standing-calf-raise", 3, 10, 15, 60)] },
     ],
   },
+  {
+    name: "Upper / Lower · 5 giorni (intermedio)",
+    days: [
+      { name: "Parte superiore A", estimatedMins: 55, exercises: [entry("bench-press", 3, 6, 10, 120, 2.5), entry("seated-cable-row", 3, 8, 12, 90), entry("lat-pulldown", 2, 8, 12, 90), entry("shoulder-press", 2, 8, 12, 90), entry("dumbbell-curl", 2, 10, 15, 60), entry("cable-triceps-pushdown", 2, 10, 15, 60)] },
+      { name: "Parte inferiore A", estimatedMins: 55, exercises: [entry("barbell-squat", 3, 6, 10, 150, 2.5), entry("romanian-deadlift", 3, 8, 10, 120, 2.5), entry("leg-press", 2, 10, 12, 120), entry("leg-curl", 2, 10, 15, 75), entry("standing-calf-raise", 3, 10, 15, 60), entry("dead-bug", 2, 8, 12, 60)] },
+      { name: "Spinta", estimatedMins: 50, exercises: [entry("dumbbell-bench-press", 3, 8, 12, 90), entry("incline-dumbbell-press", 2, 8, 12, 90), entry("shoulder-press", 2, 8, 12, 90), entry("lateral-raise", 3, 12, 15, 60), entry("cable-triceps-pushdown", 2, 10, 15, 60)] },
+      { name: "Trazione", estimatedMins: 50, exercises: [entry("lat-pulldown", 3, 8, 12, 90), entry("seated-cable-row", 3, 8, 12, 90), entry("chest-supported-row", 2, 8, 12, 90), entry("dumbbell-curl", 3, 10, 15, 60)] },
+      { name: "Parte inferiore B", estimatedMins: 55, exercises: [entry("split-squat", 3, 8, 12, 90), entry("hip-thrust", 3, 8, 12, 120), entry("leg-extension", 2, 10, 15, 75), entry("leg-curl", 3, 10, 15, 75), entry("standing-calf-raise", 3, 10, 15, 60)] },
+    ],
+  },
+  {
+    name: "Spinta / Trazione / Gambe · 6 giorni (avanzato)",
+    days: [
+      { name: "Spinta A", estimatedMins: 50, exercises: [entry("bench-press", 3, 6, 10, 120, 2.5), entry("incline-dumbbell-press", 3, 8, 12, 90), entry("shoulder-press", 2, 8, 12, 90), entry("lateral-raise", 2, 12, 15, 60), entry("cable-triceps-pushdown", 2, 10, 15, 60)] },
+      { name: "Trazione A", estimatedMins: 50, exercises: [entry("lat-pulldown", 3, 8, 12, 90), entry("seated-cable-row", 3, 8, 12, 90), entry("chest-supported-row", 2, 8, 12, 90), entry("dumbbell-curl", 3, 10, 15, 60)] },
+      { name: "Gambe A", estimatedMins: 55, exercises: [entry("barbell-squat", 3, 6, 10, 150, 2.5), entry("romanian-deadlift", 3, 8, 10, 120, 2.5), entry("leg-press", 2, 10, 12, 120), entry("leg-curl", 2, 10, 15, 75), entry("standing-calf-raise", 3, 10, 15, 60)] },
+      { name: "Spinta B", estimatedMins: 50, exercises: [entry("dumbbell-bench-press", 3, 8, 12, 90), entry("shoulder-press", 3, 8, 12, 90), entry("lateral-raise", 3, 12, 15, 60), entry("cable-triceps-pushdown", 3, 10, 15, 60)] },
+      { name: "Trazione B", estimatedMins: 50, exercises: [entry("lat-pulldown", 3, 8, 12, 90), entry("seated-cable-row", 3, 8, 12, 90), entry("chest-supported-row", 2, 8, 12, 90), entry("dumbbell-curl", 3, 10, 15, 60)] },
+      { name: "Gambe B", estimatedMins: 55, exercises: [entry("split-squat", 3, 8, 12, 90), entry("hip-thrust", 3, 8, 12, 120), entry("leg-extension", 2, 10, 15, 75), entry("leg-curl", 2, 10, 15, 75), entry("standing-calf-raise", 3, 10, 15, 60)] },
+    ],
+  },
 ];
 
 try {

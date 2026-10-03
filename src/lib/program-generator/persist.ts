@@ -66,6 +66,7 @@ export async function generateAndAssignPlan(userId: string) {
     goal: goal(onboarding.primaryGoal),
     equipment: parse(onboarding.equipmentJson),
     priorities: muscles(parse(onboarding.musclePrioritiesJson)),
+    sessionMinutes: profile.sessionMinutes,
   });
 
   const rows = await prisma.exercise.findMany({
@@ -105,7 +106,7 @@ export async function generateAndAssignPlan(userId: string) {
           create: generated.days.map((day, i) => ({
             dayNumber: i + 1,
             name: day.name,
-            estimatedMins: preferences.experience === "BEGINNER" ? 45 : preferences.goal === "STRENGTH" ? 60 : 50,
+            estimatedMins: preferences.sessionMinutes,
             exercises: {
               create: day.exercises.map((exercise, orderIndex) => ({
                 exerciseId: exercise.exerciseId,

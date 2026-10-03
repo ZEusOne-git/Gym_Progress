@@ -16,7 +16,7 @@ export default async function ExercisePage({ params }: PageProps) {
       include: {
         media: {
           where: { isActive: true },
-          orderBy: [{ isPrimary: "desc" }, { createdAt: "desc" }],
+          orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }],
         },
       },
     }),
@@ -53,6 +53,14 @@ export default async function ExercisePage({ params }: PageProps) {
     .flatMap(template => template.exercises)
     .find(item => item.exercise.slug === slug);
 
+  const media = exercise.media.map(item => ({
+    url: item.url,
+    type: item.type,
+    attribution: item.attribution,
+    sourceUrl: item.sourceUrl,
+  }));
+  const primaryMedia = media[0] ?? null;
+
   return (
     <ExercisePlayer
       exerciseIndex={index >= 0 ? index : 0}
@@ -66,10 +74,11 @@ export default async function ExercisePage({ params }: PageProps) {
         rest: prescription?.restSeconds ?? 90,
         instructions: JSON.parse(exercise.instructionsJson),
         cues: JSON.parse(exercise.cuesJson),
-        mediaUrl: exercise.media[0]?.url ?? null,
-        mediaType: exercise.media[0]?.type ?? null,
-        attribution: exercise.media[0]?.attribution ?? null,
-        sourceUrl: exercise.media[0]?.sourceUrl ?? null,
+        mediaUrl: primaryMedia?.url ?? null,
+        mediaType: primaryMedia?.type ?? null,
+        attribution: primaryMedia?.attribution ?? null,
+        sourceUrl: primaryMedia?.sourceUrl ?? null,
+        media,
       }}
     />
   );

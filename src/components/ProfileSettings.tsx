@@ -124,6 +124,9 @@ export default function ProfileSettings({
               );
             })}
           </div>
+          <p className="mt-2 text-xs leading-5 text-[var(--muted)]">
+            Se deselezioni tutto, il programma cercherà di usare esercizi a corpo libero.
+          </p>
         </div>
       </div>
 

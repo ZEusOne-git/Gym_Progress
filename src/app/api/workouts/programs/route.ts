@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
 import { findAlternativeExercise, isEquipmentCompatible, parseEquipment } from "@/lib/equipment";
 import { FREE_EXERCISE_SET } from "@/lib/program-generator/free-exercise-catalog";
 import type { Prisma } from "@prisma/client";
@@ -29,13 +28,16 @@ function planEquipmentFit(plan: { templates: { exercises: { exercise: { equipmen
   return { available, total: requirements.length, compatible, unsupported, percent: requirements.length ? Math.round((compatible / requirements.length) * 100) : 100 };
 }
 
+const freeExerciseWhere = { exercise: { slug: { in: [...FREE_EXERCISE_SET] } } } as const;
+
 const generatedTemplateSelect = {
   id: true,
   dayNumber: true,
   name: true,
   estimatedMins: true,
-  _count: { select: { exercises: true } },
+  _count: { select: { exercises: { where: freeExerciseWhere } } },
   exercises: {
+    where: freeExerciseWhere,
     orderBy: { orderIndex: "asc" as const },
     select: {
       exercise: {
@@ -71,7 +73,7 @@ export async function GET() {
     prisma.workoutPlan.findMany({
       where: { isTemplate: true, isActive: true, OR: [{ userId: null }, { userId: user.id }] },
       orderBy: { updatedAt: "desc" },
-      select: { id: true, name: true, templates: { orderBy: { dayNumber: "asc" }, select: { id: true, dayNumber: true, name: true, estimatedMins: true, _count: { select: { exercises: true } }, exercises: { select: { exercise: { select: { equipment: true } } } } } } },
+      select: { id: true, name: true, templates: { orderBy: { dayNumber: "asc" }, select: { id: true, dayNumber: true, name: true, estimatedMins: true, _count: { select: { exercises: { where: freeExerciseWhere } } }, exercises: { where: freeExerciseWhere, select: { exercise: { select: { equipment: true } } } } } } },
     }),
     prisma.workoutPlan.findFirst({
       where: { userId: user.id, isActive: true, isTemplate: false },

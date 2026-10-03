@@ -1,20 +1,83 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowLeft, Check, Clock3, Dumbbell, Play, TimerReset } from "lucide-react";
+import { ArrowLeft, CalendarDays, Check, Clock3, Dumbbell, Play, TimerReset } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
-export default async function WorkoutPage({ searchParams }: { searchParams: Promise<{ day?: string; date?: string }> }) {
-  const user = await getCurrentUser(); if (!user) redirect("/login?next=/workout"); if (!user.onboarding?.completedAt) redirect("/onboarding");
-  const params = await searchParams; const requestedDay = Number(params.day);
-  const plan = await prisma.workoutPlan.findFirst({ where: { userId: user.id, isActive: true, isTemplate: false }, orderBy: { updatedAt: "desc" }, select: { id: true, name: true, templates: { orderBy: { dayNumber: "asc" }, select: { id: true, dayNumber: true, name: true, estimatedMins: true, exercises: { orderBy: { orderIndex: "asc" }, select: { id: true, sets: true, repMin: true, repMax: true, restSeconds: true, targetWeight: true, exercise: { select: { name: true, category: true } } } } } } } });
-  const template = plan?.templates.find(t => t.dayNumber === requestedDay) ?? plan?.templates[0] ?? null;
-  if (!plan || !template) return <main className="min-h-screen p-8"><Link href="/calendar" className="text-sm font-bold text-[var(--accent)]">← Torna al calendario</Link><h1 className="mt-6 text-3xl font-black">Nessun programma assegnato</h1><p className="mt-2 text-[var(--muted)]">Quando l&apos;admin assegnerà una scheda, la vedrai qui.</p></main>;
-  const totalMinutes = template.estimatedMins ?? Math.max(15, Math.round(template.exercises.reduce((sum, e) => sum + Math.max(4, e.sets * 3), 0))); const recovery = Math.max(1, Math.round(template.exercises.reduce((s, e) => s + e.restSeconds, 0) / 60));
+export default async function WorkoutPage({ searchParams }: { searchParams: Promise<{ day?: string; date?: string; template?: string }> }) {
+  const user = await getCurrentUser();
+  if (!user) redirect("/login?next=/workout");
+  if (!user.onboarding?.completedAt) redirect("/onboarding");
+
+  const params = await searchParams;
+  const requestedDay = Number(params.day);
+  const requestedDate = params.date ? new Date(`${params.date}T12:00:00`) : null;
+  const hasValidDate = Boolean(requestedDate && !Number.isNaN(requestedDate.getTime()));
+
+  const plan = await prisma.workoutPlan.findFirst({
+    where: { userId: user.id, isActive: true, isTemplate: false },
+    orderBy: { updatedAt: "desc" },
+    select: {
+      id: true,
+      name: true,
+      templates: {
+        orderBy: { dayNumber: "asc" },
+        select: {
+          id: true,
+          dayNumber: true,
+          name: true,
+          estimatedMins: true,
+          exercises: {
+            orderBy: { orderIndex: "asc" },
+            select: {
+              id: true,
+              sets: true,
+              repMin: true,
+              repMax: true,
+              restSeconds: true,
+              targetWeight: true,
+              exercise: { select: { name: true, category: true } },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  if (!plan) {
+    return <main className="min-h-screen p-8"><Link href="/calendar" className="text-sm font-bold text-[var(--accent)]">← Torna al calendario</Link><h1 className="mt-6 text-3xl font-black">Nessun programma assegnato</h1><p className="mt-2 text-[var(--muted)]">Completa il tuo profilo per generare il programma personalizzato.</p></main>;
+  }
+
+  const schedule = hasValidDate
+    ? await prisma.workoutSchedule.findFirst({
+        where: { userId: user.id, workoutPlanId: plan.id, scheduledDate: { gte: new Date(requestedDate!.getFullYear(), requestedDate!.getMonth(), requestedDate!.getDate()), lt: new Date(requestedDate!.getFullYear(), requestedDate!.getMonth(), requestedDate!.getDate() + 1) } },
+        select: { id: true, scheduledDate: true, templateId: true, template: { select: { id: true, dayNumber: true } }, session: { select: { id: true, completedAt: true, endedEarly: true } } },
+      })
+    : null;
+
+  const template = plan.templates.find(t => t.id === params.template)
+    ?? (schedule ? plan.templates.find(t => t.id === schedule.templateId) : null)
+    ?? plan.templates.find(t => t.dayNumber === requestedDay)
+    ?? plan.templates[0]
+    ?? null;
+
+  if (!template) return <main className="min-h-screen p-8"><Link href="/calendar" className="text-sm font-bold text-[var(--accent)]">← Torna al calendario</Link><h1 className="mt-6 text-3xl font-black">Scheda non disponibile</h1></main>;
+
+  if (hasValidDate && !schedule) {
+    return <main className="min-h-screen bg-[var(--background)] pb-28"><div className="mx-auto max-w-3xl px-5 py-8 sm:px-8"><Link href="/calendar" className="inline-flex items-center gap-2 text-sm font-bold text-[var(--muted)]"><ArrowLeft size={17}/> Calendario</Link><section className="mt-12 border-y border-[var(--border)] py-10"><p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--accent)]">PROGRAMMA PERSONALE</p><h1 className="mt-3 text-4xl font-black tracking-[-0.05em]">Nessun allenamento programmato</h1><p className="mt-3 max-w-xl text-sm leading-6 text-[var(--muted)]">La data richiesta non appartiene al calendario attivo. Torna al calendario per scegliere una giornata realmente prevista dal tuo piano.</p><Link href="/calendar" className="mt-6 inline-flex items-center gap-2 rounded-xl bg-[var(--accent)] px-5 py-3.5 text-sm font-black text-[var(--accent-foreground)]"><CalendarDays size={16}/> VAI AL CALENDARIO</Link></section></div></main>;
+  }
+
+  if (schedule?.session?.completedAt && !schedule.session.endedEarly) redirect(`/calendar?completed=1&date=${params.date ?? ""}`);
+
+  const totalMinutes = template.estimatedMins ?? Math.max(15, Math.round(template.exercises.reduce((sum, e) => sum + Math.max(4, e.sets * 3), 0)));
+  const recovery = Math.max(1, Math.round(template.exercises.reduce((s, e) => s + e.restSeconds, 0) / 60));
+  const workoutHref = `/workout/active?template=${template.id}${params.date ? `&date=${params.date}` : ""}`;
+
   return <main className="min-h-screen bg-[var(--background)] pb-28"><div className="mx-auto max-w-5xl px-5 py-6 sm:px-8 lg:px-10">
     <Link href="/calendar" className="inline-flex items-center gap-2 text-sm font-bold text-[var(--muted)] transition hover:text-[var(--foreground)]"><ArrowLeft size={17}/> Calendario</Link>
-    <header className="mt-8 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-xs font-black tracking-[0.2em] text-[var(--accent)]">GIORNO {template.dayNumber} · {plan.name.toUpperCase()}</p><h1 className="mt-2 text-4xl font-black tracking-tight sm:text-5xl">{template.name}</h1><p className="mt-3 max-w-2xl text-sm leading-6 text-[var(--muted)]">Tutta la scheda del giorno è qui. Quando inizi, l&apos;app ti accompagna automaticamente serie dopo serie e poi passa all&apos;esercizio successivo.</p></div><span className="inline-flex w-fit items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-xs font-bold text-[var(--muted)]"><span className="h-2 w-2 rounded-full bg-[var(--accent)]"/> Piano personale</span></header>
-    <section className="mt-8 overflow-hidden rounded-[2rem] bg-[var(--accent)] p-6 text-[var(--accent-foreground)] shadow-2xl sm:p-8"><div className="flex flex-col gap-7 sm:flex-row sm:items-end sm:justify-between"><div><div className="flex items-center gap-2 text-xs font-black tracking-[0.18em] opacity-70"><Dumbbell size={16}/> SESSIONE</div><p className="mt-4 text-3xl font-black">{template.exercises.length} esercizi</p><p className="mt-2 text-sm leading-6 opacity-75">Circa {totalMinutes} min · carichi consigliati già pronti. Devi solo iniziare.</p></div><Link href={`/workout/active?template=${template.id}${params.date ? `&date=${params.date}` : ""}`} className="btn-dark inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3.5 text-sm font-black !text-white"><Play size={16} fill="currentColor"/> INIZIA ALLENAMENTO</Link></div></section>
+    <header className="mt-8 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-xs font-black tracking-[0.2em] text-[var(--accent)]">GIORNO {template.dayNumber} · {plan.name.toUpperCase()}</p><h1 className="mt-2 text-4xl font-black tracking-tight sm:text-5xl">{template.name}</h1><p className="mt-3 max-w-2xl text-sm leading-6 text-[var(--muted)]">Questa è la sessione prevista dal tuo calendario. Gli esercizi e i carichi appartengono al piano personalizzato attivo.</p></div><span className="inline-flex w-fit items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-xs font-bold text-[var(--muted)]"><span className="h-2 w-2 rounded-full bg-[var(--accent)]"/> Piano personale</span></header>
+    {schedule && <div className="mt-6 flex items-center gap-3 border-y border-[var(--border)] py-3 text-xs font-bold text-[var(--muted)]"><CalendarDays size={15} className="text-[var(--accent)]"/> {requestedDate!.toLocaleDateString("it-IT", { weekday: "long", day: "numeric", month: "long" })}<span className="ml-auto text-[10px] uppercase tracking-[0.16em] text-[var(--accent)]">Sessione programmata</span></div>}
+    <section className="mt-8 overflow-hidden rounded-[2rem] bg-[var(--accent)] p-6 text-[var(--accent-foreground)] shadow-2xl sm:p-8"><div className="flex flex-col gap-7 sm:flex-row sm:items-end sm:justify-between"><div><div className="flex items-center gap-2 text-xs font-black tracking-[0.18em] opacity-70"><Dumbbell size={16}/> SESSIONE</div><p className="mt-4 text-3xl font-black">{template.exercises.length} esercizi</p><p className="mt-2 text-sm leading-6 opacity-75">Circa {totalMinutes} min · carichi consigliati già pronti. Devi solo iniziare.</p></div><Link href={workoutHref} className="btn-dark inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3.5 text-sm font-black !text-white"><Play size={16} fill="currentColor"/> INIZIA ALLENAMENTO</Link></div></section>
     <div className="mt-7 grid grid-cols-3 border-y border-[var(--border)] py-4">{[[Clock3, `${totalMinutes} min`, "Durata"], [Dumbbell, `${template.exercises.length}`, "Esercizi"], [TimerReset, `${recovery} min`, "Recupero"]].map(([Icon, value, label]) => <div key={String(label)} className="border-r border-[var(--border)] px-3 py-1 last:border-r-0 sm:px-4"><Icon className="text-[var(--accent)]" size={18}/><p className="mt-4 text-xl font-black sm:text-2xl">{String(value)}</p><p className="mt-1 text-xs text-[var(--muted)]">{String(label)}</p></div>)}</div>
     <section className="mt-9"><div className="mb-4 flex items-end justify-between gap-4"><div><p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--accent)]">SESSIONE</p><h2 className="mt-1 text-2xl font-black tracking-[-0.035em]">Esercizi</h2></div><span className="text-xs font-bold text-[var(--muted)]">{template.exercises.length} movimenti</span></div><div className="divide-y divide-[var(--border)] border-y border-[var(--border)]">{template.exercises.map((item,index) => <div key={item.id} className="flex items-center gap-4 py-4 sm:py-5"><div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--surface-strong)] text-[var(--accent)]"><Check size={18}/></div><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><p className="font-black">{index + 1}. {item.exercise.name}</p><span className="rounded-full bg-[var(--surface-strong)] px-2.5 py-1 text-[10px] font-black text-[var(--muted)]">{item.exercise.category}</span></div><p className="mt-1 text-sm text-[var(--muted)]">{item.sets} serie × {item.repMin}–{item.repMax} reps{item.targetWeight ? ` · ${item.targetWeight} kg consigliati` : ""}</p></div><span className="hidden text-xs font-bold text-[var(--muted)] sm:block">{item.restSeconds}s recupero</span></div>)}</div></section>
     </div></main>;

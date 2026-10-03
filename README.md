@@ -51,6 +51,8 @@ npm run dev
 
 `db:seed` imports the RepDB free-tier exercise catalog and its static WebP pose illustrations for use inside this app. It requires network access during seeding. RepDB requires visible attribution. The free dataset does not include production-licensed animated GIFs; its paid-tier preview animations must not be used in production.
 
+The seed also creates five initial workout programs as unpublished drafts. Review their exercises and equipment fit in `/admin/programs`, then publish only the programs approved for athletes.
+
 ## Environment
 
 `DATABASE_URL` is required. The current Prisma schema uses SQLite. A production host must provide a persistent writable disk for the database and uploaded exercise media, and run a single app instance. Ephemeral/serverless filesystems are not supported by this configuration. PostgreSQL and remote object storage need an explicit schema/provider integration before using those services.
@@ -59,7 +61,7 @@ Set `NODE_ENV=production` in production. Demo accounts and demo workout plans ar
 
 Login attempts are counted by a hashed email key in the database; five failed attempts within 15 minutes trigger a 15-minute cooldown, and inactive throttle records are pruned after 24 hours. Before opening registration to real users, also configure edge rate limits for `/api/auth/login` and `/api/auth/register`, publish the app behind HTTPS, and provide the privacy and data-retention information required for the service owner and jurisdiction.
 
-Exercise data by [RepDB](https://repdb.co).
+[Exercise data by RepDB (repdb.co)](https://repdb.co).
 
 ## Design
 

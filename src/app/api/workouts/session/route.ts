@@ -7,7 +7,6 @@ function parseDate(value: unknown) {
   const [y, m, d] = value.split("-").map(Number);
   const date = new Date(y, m - 1, d);
   if (date.getFullYear() !== y || date.getMonth() !== m - 1 || date.getDate() !== d) return null;
-  date.setHours(12, 0, 0, 0);
   return date;
 }
 
@@ -19,7 +18,9 @@ export async function GET(request: Request) {
   const scheduledDate = parseDate(url.searchParams.get("date"));
   if (!templateId) return NextResponse.json({ session: null });
 
-  const schedule = scheduledDate ? await prisma.workoutSchedule.findFirst({ where: { userId: user.id, templateId, scheduledDate }, select: { id: true } }) : null;
+  const schedule = scheduledDate
+    ? await prisma.workoutSchedule.findFirst({ where: { userId: user.id, templateId, scheduledDate }, select: { id: true } })
+    : null;
   const session = schedule
     ? await prisma.workoutSession.findFirst({ where: { userId: user.id, scheduleId: schedule.id, completedAt: null }, orderBy: { startedAt: "desc" }, select: { id: true, startedAt: true, pausedAt: true, elapsedSeconds: true, sets: { orderBy: [{ exerciseId: "asc" }, { setNumber: "asc" }], select: { id: true, exerciseId: true, setNumber: true, weight: true, reps: true, rir: true, completed: true } } } })
     : await prisma.workoutSession.findFirst({ where: { userId: user.id, completedAt: null, plan: { isActive: true, isTemplate: false, templates: { some: { id: templateId } } } }, orderBy: { startedAt: "desc" }, select: { id: true, startedAt: true, pausedAt: true, elapsedSeconds: true, sets: { orderBy: [{ exerciseId: "asc" }, { setNumber: "asc" }], select: { id: true, exerciseId: true, setNumber: true, weight: true, reps: true, rir: true, completed: true } } } });
@@ -37,7 +38,9 @@ export async function POST(request: Request) {
     if (!template) return NextResponse.json({ error: "Workout non disponibile." }, { status: 404 });
 
     const scheduledDate = parseDate(body.date);
-    const schedule = scheduledDate ? await prisma.workoutSchedule.findFirst({ where: { userId: user.id, workoutPlanId: template.workoutPlanId, templateId: template.id, scheduledDate }, select: { id: true } }) : null;
+    const schedule = scheduledDate
+      ? await prisma.workoutSchedule.findFirst({ where: { userId: user.id, workoutPlanId: template.workoutPlanId, templateId: template.id, scheduledDate }, select: { id: true } })
+      : null;
 
     if (schedule) {
       const existingScheduled = await prisma.workoutSession.findUnique({ where: { scheduleId: schedule.id }, select: { id: true, userId: true, startedAt: true, pausedAt: true, elapsedSeconds: true, completedAt: true, endedEarly: true } });
@@ -89,7 +92,7 @@ export async function PATCH(request: Request) {
       if (session.pausedAt) return NextResponse.json({ ok: true, paused: true, session: { id: session.id, startedAt: session.startedAt, pausedAt: session.pausedAt, elapsedSeconds: session.elapsedSeconds } });
       const now = new Date();
       const additionalSeconds = Math.max(0, Math.floor((now.getTime() - session.startedAt.getTime()) / 1000));
-      const paused = await prisma.workoutSession.update({ where: { id: session.id }, data: { pausedAt: now, elapsedSeconds: { increment: additionalSeconds } }, select: { id: true, startedAt: true, pausedAt: true, elapsedSeconds: true } });
+      const paused = await prisma.workoutSession.update({ where: { id: session.id }, data: { pausedAt: now, elapsedSeconds: { increment: additionalSeconds } }, select: { id: session.id, startedAt: true, pausedAt: true, elapsedSeconds: true } });
       return NextResponse.json({ ok: true, paused: true, session: paused });
     }
     if (session.pausedAt) return NextResponse.json({ error: "Allenamento in pausa. Riprendilo prima di completarlo." }, { status: 400 });
@@ -99,13 +102,21 @@ export async function PATCH(request: Request) {
       const finished = await prisma.workoutSession.update({ where: { id: sessionId }, data: { completedAt: now, endedEarly: true, elapsedSeconds: { increment: additionalSeconds } }, select: { id: true, completedAt: true, endedEarly: true, elapsedSeconds: true } });
       return NextResponse.json({ ok: true, finishedEarly: true, session: finished });
     }
-    const currentTemplate = session.schedule?.template ?? (() => { const sessionExerciseIds = new Set(session.sets.map(set => set.exerciseId)); return session.plan.templates.find(template => { const templateExerciseIds = new Set(template.exercises.map(item => item.exerciseId)); return templateExerciseIds.size === sessionExerciseIds.size && [...templateExerciseIds].every(id => sessionExerciseIds.has(id)); }) ?? null; })();
+    const currentTemplate = session.schedule?.template ?? (() => {
+      const sessionExerciseIds = new Set(session.sets.map((set) => set.exerciseId));
+      return session.plan.templates.find((template) => {
+        const templateExerciseIds = new Set(template.exercises.map((item) => item.exerciseId));
+        return templateExerciseIds.size === sessionExerciseIds.size && [...templateExerciseIds].every((id) => sessionExerciseIds.has(id));
+      }) ?? null;
+    })();
     if (currentTemplate) {
       for (const item of currentTemplate.exercises) {
-        const completedSets = session.sets.filter(set => set.exerciseId === item.exerciseId && set.completed);
+        const completedSets = session.sets.filter((set) => set.exerciseId === item.exerciseId && set.completed);
         if (completedSets.length < item.sets) return NextResponse.json({ error: "Completa tutte le serie previste prima di chiudere l'allenamento." }, { status: 400 });
       }
-    } else if (!session.sets.length || session.sets.some(set => !set.completed)) return NextResponse.json({ error: "Completa tutte le serie prima di chiudere l'allenamento." }, { status: 400 });
+    } else if (!session.sets.length || session.sets.some((set) => !set.completed)) {
+      return NextResponse.json({ error: "Completa tutte le serie prima di chiudere l'allenamento." }, { status: 400 });
+    }
     const now = new Date();
     const additionalSeconds = Math.max(0, Math.floor((now.getTime() - session.startedAt.getTime()) / 1000));
     const updated = await prisma.workoutSession.update({ where: { id: sessionId }, data: { completedAt: now, endedEarly: false, elapsedSeconds: { increment: additionalSeconds } }, select: { id: true, completedAt: true, elapsedSeconds: true } });

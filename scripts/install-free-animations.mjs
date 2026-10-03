@@ -1,4 +1,5 @@
-import { existsSync, mkdirSync, readdirSync, rmSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, statSync } from "node:fs";
+import { readFile, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { FREE_EXERCISE_SLUGS } from "../prisma/free-exercise-catalog.mjs";
 
@@ -25,10 +26,7 @@ mkdirSync(destinationDir, { recursive: true });
 for (const file of files) {
   const source = join(sourceDir, file);
   const destination = join(destinationDir, file);
-  // Keep this script dependency-free; the shell cp is deliberately avoided so it
-  // behaves consistently on macOS, Linux and CI environments.
-  const bytes = await import("node:fs/promises").then(fs => fs.readFile(source));
-  await import("node:fs/promises").then(fs => fs.writeFile(destination, bytes));
+  await writeFile(destination, await readFile(source));
 }
 
 console.log(`Installed ${files.length} allowlisted exercise animations into public/animations.`);

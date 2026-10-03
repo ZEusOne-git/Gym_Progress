@@ -14,6 +14,7 @@
     "db:seed:test": "node prisma/seed-test-program.mjs",
     "db:import:repdb": "node prisma/import-repdb-exercises.mjs",
     "db:adapt:free": "node prisma/adapt-free-programs.mjs",
+    "db:verify:free": "node prisma/verify-free-programs.mjs",
     "animations:install": "node scripts/install-free-animations.mjs",
     "db:studio": "prisma studio",
     "db:migrate": "prisma migrate dev",

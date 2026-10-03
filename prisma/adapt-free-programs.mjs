@@ -1,3 +1,5 @@
+import fs from "node:fs";
+import path from "node:path";
 import { PrismaClient } from "@prisma/client";
 import { FREE_EXERCISE_SET } from "./free-exercise-catalog.mjs";
 
@@ -42,6 +44,11 @@ function nextMonday() {
   monday.setDate(today.getDate() + daysUntilMonday);
   monday.setHours(12, 0, 0, 0);
   return { today, monday };
+}
+
+function assertAnimationFiles() {
+  const missing = [...FREE_EXERCISE_SET].filter((slug) => !fs.existsSync(path.resolve(process.cwd(), "public", "animations", `${slug}.webp`)));
+  if (missing.length) throw new Error(`Animazioni free mancanti in public/animations: ${missing.join(", ")}`);
 }
 
 async function adaptTemplates(freeExercises) {
@@ -97,7 +104,7 @@ async function adaptTemplates(freeExercises) {
 
 async function assertTemplatesAreFree() {
   const remaining = await prisma.workoutExercise.findMany({
-    where: { workoutTemplate: { workoutPlan: { isTemplate: true } } },
+    where: { template: { plan: { isTemplate: true } } },
     select: { exercise: { select: { slug: true } } },
   });
   const invalid = [...new Set(remaining.map((item) => item.exercise.slug).filter((slug) => !FREE_EXERCISE_SET.has(slug)))];
@@ -190,6 +197,7 @@ async function assignPlansToUsers() {
 }
 
 async function main() {
+  assertAnimationFiles();
   const freeExercises = await prisma.exercise.findMany({
     where: { isActive: true, slug: { in: [...FREE_EXERCISE_SET] } },
     select: { id: true, slug: true, name: true, category: true, primaryMuscles: true, equipment: true, difficulty: true },

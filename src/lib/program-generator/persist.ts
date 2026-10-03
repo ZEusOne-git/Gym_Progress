@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import type { Prisma } from "@prisma/client";
 import { generatePlan } from "./generator";
 import { normalizePlanPreferences } from "./plan-profile";
 import type { ExerciseCandidate, MusclePriority, PlanPreferences } from "./types";
@@ -34,7 +35,7 @@ const monday = (date: Date) => {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate() - day + 1);
 };
 
-async function createCalendar(tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0], userId: string, planId: string, templateIds: string[], days: PlanPreferences["trainingDays"]) {
+async function createCalendar(tx: Prisma.TransactionClient, userId: string, planId: string, templateIds: string[], days: PlanPreferences["trainingDays"]) {
   const today = dayStart(new Date());
   const firstMonday = monday(today);
   const rows: { userId: string; workoutPlanId: string; templateId: string; scheduledDate: Date }[] = [];
@@ -91,7 +92,6 @@ export async function generateAndAssignPlan(userId: string) {
 
     if (activePlanIds.length) {
       await tx.workoutPlan.updateMany({ where: { id: { in: activePlanIds } }, data: { isActive: false } });
-      // Remove future calendar slots from the replaced plan, but keep workout sessions/history.
       await tx.workoutSchedule.deleteMany({ where: { userId, workoutPlanId: { in: activePlanIds }, scheduledDate: { gte: todayStart() } } });
     }
 

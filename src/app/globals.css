@@ -37,7 +37,7 @@ a { color: inherit; text-decoration: none; }
 .btn-outline-on-accent, button.btn-outline-on-accent, a.btn-outline-on-accent { background: transparent !important; border: 1px solid var(--accent-foreground) !important; color: var(--accent-foreground) !important; }
 .btn-outline-on-accent:hover, button.btn-outline-on-accent:hover, a.btn-outline-on-accent:hover { background: color-mix(in srgb, var(--accent-foreground) 8%, transparent) !important; }
 
-button[class*="bg-[var(--accent)]"], a[class*="bg-[var(--accent)]"], button[class*="bg-[var(--accent)]"] *, a[class*="bg-[var(--accent)]"] *, button[class*="bg-lime-"], a[class*="bg-lime-"], button[class*="bg-lime-"] *, a[class*="bg-lime-"] *, button[class*="bg-yellow-"], a[class*="bg-yellow-"] *, button[class*="bg-yellow-"] { color: var(--accent-foreground) !important; }
+button[class*="bg-[var(--accent)]"], a[class*="bg-[var(--accent)]"], button[class*="bg-[var(--accent)]"] *, a[class*="bg-[var(--accent)]"] *, button[class*="bg-lime-"], a[class*="bg-lime-"], button[class*="bg-lime-"] *, a[class*="bg-lime-"] *, button[class*="bg-yellow-"], a[class*="bg-yellow-"], button[class*="bg-yellow-"] * { color: var(--accent-foreground) !important; }
 button[class*="bg-[var(--dark-button)]"], a[class*="bg-[var(--dark-button)]"], button[class*="bg-black"], a[class*="bg-black"], button[class*="bg-zinc-900"], a[class*="bg-zinc-900"], button[class*="bg-neutral-900"], a[class*="bg-neutral-900"] { color: var(--dark-button-foreground) !important; }
 button[class*="bg-white"], a[class*="bg-white"], button[class*="bg-gray-50"], a[class*="bg-gray-50"], button[class*="bg-slate-50"], a[class*="bg-slate-50"] { color: var(--dark-button) !important; }
 [class*="bg-[var(--accent)]"], [class*="bg-lime-"], [class*="bg-yellow-"] { color: var(--accent-foreground) !important; }
@@ -68,7 +68,6 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
 [data-calendar-card] > div { transition: transform 420ms cubic-bezier(.22,1,.36,1), background-color 420ms ease, border-color 420ms ease, box-shadow 420ms ease, color 240ms ease; }
 [data-calendar-card]:not(:has(> div.border-[var\(--accent\)])):hover > div { transform: translateY(-2px); }
 
-/* Active workout: keep the animation visible instead of letting the exercise card cover the whole viewport. */
 @media (max-width: 639px) {
   html, body { width: 100%; overflow-x: hidden; }
   body { overscroll-behavior-x: none; }
@@ -85,7 +84,6 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
   div.touch-pan-y > div[class*="grid-cols-5"] > button > span:nth-child(2) { box-shadow: 0 8px 22px color-mix(in srgb, var(--foreground) 4%, transparent); }
   div.touch-pan-y > div[class*="grid-cols-5"] > button:nth-child(3) > span:nth-child(2) { box-shadow: 0 14px 34px color-mix(in srgb, var(--accent) 20%, transparent); }
 
-  /* Workout: keep the whole control zone inside the phone viewport. */
   main.min-h-screen { min-height: 100svh; min-height: 100dvh; }
   main.min-h-screen > div.min-h-screen { min-height: 100svh; min-height: 100dvh; }
   main.min-h-screen > div.min-h-screen > header { flex: 0 0 auto; }
@@ -93,14 +91,15 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
   main.min-h-screen button { touch-action: manipulation; }
   main.min-h-screen input { min-height: 48px; }
 
-  /* New active-workout layout uses a full-viewport main rather than the older min-h-screen shell. */
-  main[class*="h-[100dvh]"] > div:nth-child(2) > div.mt-auto { max-height: 46dvh; overflow-y: auto; overscroll-behavior: contain; }
-  main[class*="h-[100dvh]"] > div:nth-child(2) > div.mt-auto > div { background: rgba(0, 0, 0, .68); }
+  /* Active workout: the animation gets a dedicated visual area and the control card becomes a compact lower sheet. */
+  main[class*="h-[100dvh]"] > div:nth-child(2) > div.mt-auto { max-height: 42dvh; overflow-y: auto; overscroll-behavior: contain; }
+  main[class*="h-[100dvh]"] > div:nth-child(2) > div.mt-auto > div { background: rgba(0, 0, 0, .72); }
+  main[class*="h-[100dvh]"] > div:first-child > div:nth-child(2) { background: linear-gradient(to bottom, rgba(0,0,0,.28), rgba(0,0,0,.04) 45%, rgba(0,0,0,.58)) !important; }
   main[class*="h-[100dvh]"] > div:first-child img { max-height: 100%; }
 }
 
 @media (max-width: 639px) and (min-height: 780px) {
-  main[class*="h-[100dvh]"] > div:nth-child(2) > div.mt-auto { max-height: 42dvh; }
+  main[class*="h-[100dvh]"] > div:nth-child(2) > div.mt-auto { max-height: 40dvh; }
 }
 
 @media (max-height: 740px) and (max-width: 639px) {
@@ -109,8 +108,7 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
   main.min-h-screen h1 { line-height: .95 !important; }
   main.min-h-screen h2 { line-height: 1 !important; }
   main.min-h-screen .min-h-14 { min-height: 52px !important; }
-
-  main[class*="h-[100dvh]"] > div:nth-child(2) > div.mt-auto { max-height: 50dvh; }
+  main[class*="h-[100dvh]"] > div:nth-child(2) > div.mt-auto { max-height: 48dvh; }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -43,7 +43,7 @@ export default function AdminUsersPage() {
       <div className="mx-auto max-w-6xl">
         <div className="mb-8 flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
           <div>
-            <p className="mb-2 text-xs font-black uppercase tracking-[.2em] text-[var(--accent)]">People</p>
+            <p className="mb-2 text-xs font-black uppercase tracking-[.2em] text-[var(--accent)]">Persone</p>
             <h1 className="text-3xl font-black tracking-tight md:text-4xl">Utenti</h1>
             <p className="mt-2 max-w-xl text-sm text-[var(--muted)]">Panoramica degli utenti dell&apos;app, del programma assegnato e dell&apos;attività registrata.</p>
           </div>

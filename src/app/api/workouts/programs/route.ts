@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
 import { findAlternativeExercise, isEquipmentCompatible, parseEquipment } from "@/lib/equipment";
 
 function weekdaysFor(count: number) {
-  const presets: Record<number, number[]> = { 1: [1], 2: [1, 5], 3: [1, 3, 5], 4: [1, 3, 5, 7], 5: [1, 2, 4, 5, 7], 6: [1, 2, 3, 4, 5, 7], 7: [1, 2, 3, 4, 5, 6, 7] };
+  const presets: Record<number, number[]> = {
+    1: [1], 2: [1, 5], 3: [1, 3, 5], 4: [1, 3, 5, 7], 5: [1, 2, 4, 5, 7], 6: [1, 2, 3, 4, 5, 7], 7: [1, 2, 3, 4, 5, 6, 7],
+  };
   return (presets[Math.max(1, Math.min(count, 7))] ?? presets[4]).slice(0, count);
 }
 
@@ -94,15 +95,63 @@ export async function POST(request: Request) {
   const result = await prisma.$transaction(async tx => {
     const openSession = await tx.workoutSession.findFirst({ where: { userId: user.id, completedAt: null }, select: { id: true } });
     if (openSession) return null;
+
     await tx.workoutSchedule.deleteMany({ where: { userId: user.id, scheduledDate: { gte: today }, session: { is: null } } });
     await tx.workoutSchedule.deleteMany({ where: { userId: user.id, scheduledDate: { gte: monday }, session: { is: { completedAt: { not: null } } } } });
     await tx.workoutPlan.updateMany({ where: { userId: user.id, isActive: true, isTemplate: false }, data: { isActive: false } });
-    const plan = await tx.workoutPlan.create({ data: { userId: user.id, name: source.name, version: source.version, isActive: true, isTemplate: false, templates: { create: source.templates.map(day => ({ dayNumber: day.dayNumber, name: day.name, estimatedMins: day.estimatedMins, exercises: { create: day.exercises.map(ex => { const exerciseId = resolvedExercises.get(ex.id) ?? ex.exerciseId; const adapted = exerciseId !== ex.exerciseId; return { exerciseId, orderIndex: ex.orderIndex, sets: ex.sets, repMin: ex.repMin, repMax: ex.repMax, rirTarget: ex.rirTarget, restSeconds: ex.restSeconds, setType: ex.setType, progressionType: ex.progressionType, loadIncrement: adapted ? null : ex.loadIncrement, tempo: ex.tempo, targetWeight: adapted ? null : ex.targetWeight, notes: adapted ? "Esercizio adattato all'attrezzatura disponibile." : ex.notes }; }) } })) } }, include: { templates: { orderBy: { dayNumber: "asc" } } });
+
+    const plan = await tx.workoutPlan.create({
+      data: {
+        userId: user.id,
+        name: source.name,
+        version: source.version,
+        isActive: true,
+        isTemplate: false,
+        templates: {
+          create: source.templates.map(day => ({
+            dayNumber: day.dayNumber,
+            name: day.name,
+            estimatedMins: day.estimatedMins,
+            exercises: {
+              create: day.exercises.map(ex => {
+                const exerciseId = resolvedExercises.get(ex.id) ?? ex.exerciseId;
+                const adapted = exerciseId !== ex.exerciseId;
+                return {
+                  exerciseId,
+                  orderIndex: ex.orderIndex,
+                  sets: ex.sets,
+                  repMin: ex.repMin,
+                  repMax: ex.repMax,
+                  rirTarget: ex.rirTarget,
+                  restSeconds: ex.restSeconds,
+                  setType: ex.setType,
+                  progressionType: ex.progressionType,
+                  loadIncrement: adapted ? null : ex.loadIncrement,
+                  tempo: ex.tempo,
+                  targetWeight: adapted ? null : ex.targetWeight,
+                  notes: adapted ? "Esercizio adattato all'attrezzatura disponibile." : ex.notes,
+                };
+              }),
+            },
+          })),
+        },
+      },
+      include: { templates: { orderBy: { dayNumber: "asc" } } },
+    });
+
     const schedules: { userId: string; workoutPlanId: string; templateId: string; scheduledDate: Date }[] = [];
-    for (let week = 0; week < 12; week++) for (let index = 0; index < plan.templates.length; index++) { const scheduledDate = new Date(monday); scheduledDate.setDate(monday.getDate() + week * 7 + (weekdays[index] - 1)); scheduledDate.setHours(12, 0, 0, 0); schedules.push({ userId: user.id, workoutPlanId: plan.id, templateId: plan.templates[index].id, scheduledDate }); }
+    for (let week = 0; week < 12; week++) {
+      for (let index = 0; index < plan.templates.length; index++) {
+        const scheduledDate = new Date(monday);
+        scheduledDate.setDate(monday.getDate() + week * 7 + (weekdays[index] - 1));
+        scheduledDate.setHours(12, 0, 0, 0);
+        schedules.push({ userId: user.id, workoutPlanId: plan.id, templateId: plan.templates[index].id, scheduledDate });
+      }
+    }
     await tx.workoutSchedule.createMany({ data: schedules });
     return plan;
   });
+
   if (!result) return NextResponse.json({ error: "Riprendi e completa o termina l'allenamento in corso prima di cambiare programma." }, { status: 409 });
   return NextResponse.json({ plan: result, recurrence: { weeks: 12, weekdays }, adapted: { count: adaptations.length, applied: adaptations.length > 0 } }, { status: 201 });
 }

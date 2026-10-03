@@ -27,7 +27,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
               id: true,
               name: true,
               category: true,
-              media: { where: { isActive: true }, orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }], select: { url: true, type: true, thumbnailUrl: true, sourceName: true } },
+              media: { where: { isActive: true }, orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }], select: { url: true, type: true, thumbnailUrl: true, sourceName: true, sourceUrl: true, attribution: true } },
             },
           },
         },

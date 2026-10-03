@@ -50,6 +50,7 @@ export async function PUT(request: Request) {
   })();
   const normalizedEquipment = [...equipment].sort();
   const equipmentChanged = JSON.stringify(previousEquipment) !== JSON.stringify(normalizedEquipment);
+  const weightChanged = previousProfile?.currentWeight !== weight;
 
   const profile = await prisma.profile.upsert({
     where: { userId: user.id },
@@ -57,12 +58,12 @@ export async function PUT(request: Request) {
     create: { userId: user.id, currentWeight: weight },
   });
 
-  if (previousProfile?.currentWeight !== weight) {
+  if (weightChanged) {
     await prisma.weightLog.create({ data: { userId: user.id, weightKg: weight } });
   }
 
-  // Persist the new equipment before regenerating. The generator reads the
-  // onboarding record, so generating first would accidentally use stale gear.
+  // Persist profile inputs before regenerating. The generator reads the stored
+  // profile/onboarding records, so generating first would use stale values.
   const onboarding = await prisma.onboardingResponse.upsert({
     where: { userId: user.id },
     update: {
@@ -81,8 +82,9 @@ export async function PUT(request: Request) {
 
   let planRegeneration: "updated" | "deferred" | "unchanged" = "unchanged";
   let planRegenerationPending = false;
+  const planInputsChanged = equipmentChanged || weightChanged;
 
-  if (equipmentChanged) {
+  if (planInputsChanged) {
     const activeSession = await prisma.workoutSession.findFirst({
       where: { userId: user.id, completedAt: null },
       select: { id: true },

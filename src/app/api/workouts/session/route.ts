@@ -14,6 +14,13 @@ function parseDate(value: unknown) {
   return date;
 }
 
+function dayRange(date: Date) {
+  const start = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const end = new Date(start);
+  end.setDate(end.getDate() + 1);
+  return { gte: start, lt: end };
+}
+
 async function markPlanRegenerationPending(userId: string) {
   const onboarding = await prisma.onboardingResponse.findUnique({ where: { userId }, select: { preferencesJson: true } });
   let preferences: Record<string, unknown> = {};
@@ -59,7 +66,7 @@ export async function GET(request: Request) {
   const scheduledDate = parseDate(url.searchParams.get("date"));
   if (!templateId) return NextResponse.json({ session: null });
   const schedule = scheduledDate
-    ? await prisma.workoutSchedule.findFirst({ where: { userId: user.id, templateId, scheduledDate }, select: { id: true } })
+    ? await prisma.workoutSchedule.findFirst({ where: { userId: user.id, templateId, scheduledDate: dayRange(scheduledDate) }, select: { id: true } })
     : null;
   const session = schedule
     ? await prisma.workoutSession.findFirst({ where: { userId: user.id, scheduleId: schedule.id, completedAt: null }, orderBy: { startedAt: "desc" }, select: { id: true, startedAt: true, pausedAt: true, elapsedSeconds: true, sets: { orderBy: [{ exerciseId: "asc" }, { setNumber: "asc" }], select: { id: true, exerciseId: true, setNumber: true, weight: true, reps: true, rir: true, completed: true } } } })
@@ -80,14 +87,15 @@ export async function POST(request: Request) {
 
     const requestedDate = parseDate(body.date);
     const todayStart = new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate());
-    let schedule = requestedDate
-      ? await prisma.workoutSchedule.findFirst({ where: { userId: user.id, workoutPlanId: template.workoutPlanId, templateId: template.id, scheduledDate: requestedDate }, select: { id: true, scheduledDate: true } })
+    const requestedRange = requestedDate ? dayRange(requestedDate) : null;
+    let schedule = requestedRange
+      ? await prisma.workoutSchedule.findFirst({ where: { userId: user.id, workoutPlanId: template.workoutPlanId, templateId: template.id, scheduledDate: requestedRange }, select: { id: true, scheduledDate: true } })
       : await prisma.workoutSchedule.findFirst({ where: { userId: user.id, workoutPlanId: template.workoutPlanId, templateId: template.id, scheduledDate: { gte: todayStart }, session: { is: null } }, orderBy: { scheduledDate: "asc" }, select: { id: true, scheduledDate: true } });
     if (!schedule && requestedDate) {
-      const occupiedDate = await prisma.workoutSchedule.findFirst({ where: { userId: user.id, scheduledDate: requestedDate }, select: { id: true } });
+      const occupiedDate = await prisma.workoutSchedule.findFirst({ where: { userId: user.id, scheduledDate: requestedRange! }, select: { id: true } });
       if (!occupiedDate) {
-        try { schedule = await prisma.workoutSchedule.create({ data: { userId: user.id, workoutPlanId: template.workoutPlanId, templateId: template.id, scheduledDate: requestedDate }, select: { id: true, scheduledDate: true } }); }
-        catch { schedule = await prisma.workoutSchedule.findFirst({ where: { userId: user.id, workoutPlanId: template.workoutPlanId, templateId: template.id, scheduledDate: requestedDate }, select: { id: true, scheduledDate: true } }); }
+        try { schedule = await prisma.workoutSchedule.create({ data: { userId: user.id, workoutPlanId: template.workoutPlanId, templateId: template.id, scheduledDate: new Date(requestedDate.getFullYear(), requestedDate.getMonth(), requestedDate.getDate(), 12) }, select: { id: true, scheduledDate: true } }); }
+        catch { schedule = await prisma.workoutSchedule.findFirst({ where: { userId: user.id, workoutPlanId: template.workoutPlanId, templateId: template.id, scheduledDate: requestedRange! }, select: { id: true, scheduledDate: true } }); }
       }
     }
     if (!schedule && !requestedDate) {
@@ -95,7 +103,7 @@ export async function POST(request: Request) {
         const candidateDate = new Date(todayStart);
         candidateDate.setDate(candidateDate.getDate() + offset);
         candidateDate.setHours(12, 0, 0, 0);
-        const existing = await prisma.workoutSchedule.findFirst({ where: { userId: user.id, scheduledDate: candidateDate }, select: { id: true } });
+        const existing = await prisma.workoutSchedule.findFirst({ where: { userId: user.id, scheduledDate: dayRange(candidateDate) }, select: { id: true } });
         if (existing) continue;
         try { schedule = await prisma.workoutSchedule.create({ data: { userId: user.id, workoutPlanId: template.workoutPlanId, templateId: template.id, scheduledDate: candidateDate }, select: { id: true, scheduledDate: true } }); }
         catch { /* keep looking */ }

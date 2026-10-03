@@ -3,10 +3,10 @@ import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 export async function GET(request: Request) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Non autorizzato" }, { status: 401 });
-
   try {
+    const user = await getCurrentUser();
+    if (!user) return NextResponse.json({ error: "Non autorizzato" }, { status: 401 });
+
     const { searchParams } = new URL(request.url);
     const month = Number(searchParams.get("month"));
     const year = Number(searchParams.get("year"));

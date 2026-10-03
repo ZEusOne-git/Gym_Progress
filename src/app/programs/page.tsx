@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, ArrowRight, CalendarDays, Check, ChevronRight, Dumbbell, Play, Sparkles } from "lucide-react";
+import { FREE_EXERCISE_SET } from "@/lib/program-generator/free-exercise-catalog";
 
 type ExerciseMedia = { type: "VIDEO" | "WEBM" | "GIF" | "IMAGE"; url: string; thumbnailUrl: string | null; sourceName: string | null; sourceUrl: string | null; attribution: string | null };
 type Exercise = { exercise: { id: string; name: string; slug?: string; equipment: string; media?: ExerciseMedia[] }; sets: number; repMin: number | null; repMax: number | null };
@@ -16,14 +17,24 @@ type Plan = {
 
 type GeneratedPlan = Plan & { isTemplate: false };
 
-function MediaPreview({ media }: { media?: ExerciseMedia[] }) {
+function MediaPreview({ media, slug }: { media?: ExerciseMedia[]; slug?: string }) {
+  const hasFreeAnimation = !!slug && FREE_EXERCISE_SET.has(slug);
   const primary = media?.[0];
+  if (hasFreeAnimation) {
+    const url = `/animations/${slug}.webp`;
+    return (
+      <a href={url} target="_blank" rel="noreferrer" className="group relative block h-14 w-20 shrink-0 overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)]">
+        <img src={url} alt="" className="h-full w-full object-cover transition group-hover:scale-105" />
+        <span className="absolute inset-x-0 bottom-0 bg-black/65 px-1.5 py-1 text-[7px] font-black uppercase tracking-[0.08em] text-white">Animazione</span>
+      </a>
+    );
+  }
   if (!primary) return <span className="inline-flex items-center gap-1 rounded-full border border-[var(--border)] px-2 py-1 text-[8px] font-black uppercase tracking-[0.12em] text-[var(--muted)]">Media non disponibile</span>;
   const isPlayable = ["VIDEO", "WEBM", "GIF"].includes(primary.type);
   return (
     <a href={primary.url} target="_blank" rel="noreferrer" className="group relative block h-14 w-20 shrink-0 overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)]">
       {primary.thumbnailUrl || primary.type === "IMAGE" ? <img src={primary.thumbnailUrl || primary.url} alt="" className="h-full w-full object-cover transition group-hover:scale-105" /> : <div className="flex h-full items-center justify-center"><Play size={18} /></div>}
-      <span className="absolute inset-x-0 bottom-0 bg-black/65 px-1.5 py-1 text-[7px] font-black uppercase tracking-[0.08em] text-white">{isPlayable ? "Video" : "Illustrazione"}</span>
+      <span className="absolute inset-x-0 bottom-0 bg-black/65 px-1.5 py-1 text-[7px] font-black uppercase tracking-[0.08em] text-white">{isPlayable ? "Video" : "Media"}</span>
     </a>
   );
 }
@@ -92,9 +103,9 @@ export default function ProgramsPage() {
             </div>
             {currentPlan && <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-3"><Link href="/calendar" className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-4 py-3 text-xs font-black text-[var(--accent-foreground)]"><CalendarDays size={16} /> VEDI CALENDARIO</Link><Link href="/workout/active" className="flex min-h-12 items-center justify-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-xs font-black"><Dumbbell size={16} /> ALLENATI</Link><Link href="/onboarding?edit=1" className="col-span-2 flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[var(--border)] px-4 py-3 text-xs font-bold text-[var(--muted)] sm:col-span-1">MODIFICA PROFILO <ArrowRight size={14} /></Link></div>}
             <div className="mt-5 divide-y divide-[var(--border)] border-y border-[var(--border)]">
-              {activePlan.templates.map(template => <div key={template.id} className="py-4"><div className="flex min-h-12 items-center justify-between gap-4"><div className="min-w-0"><p className="text-[9px] font-black uppercase tracking-[0.18em] text-[var(--muted)]">Giorno {template.dayNumber}</p><p className="mt-1 truncate text-sm font-black sm:text-base">{template.name}</p></div><div className="flex shrink-0 items-center gap-2 text-[10px] font-bold text-[var(--muted)]"><span>{template._count.exercises} esercizi</span>{template.estimatedMins ? <span>· {template.estimatedMins} min</span> : null}</div></div>{template.exercises?.length ? <div className="mt-3 grid gap-2 sm:grid-cols-2">{template.exercises.map((item, index) => <div key={`${template.id}-${item.exercise.id}-${index}`} className="flex min-w-0 items-center gap-3 rounded-xl bg-[var(--surface)]/40 px-3 py-2.5"><span className="w-5 shrink-0 text-center text-[9px] font-black text-[var(--muted)]">{index + 1}</span><div className="min-w-0 flex-1"><p className="truncate text-xs font-black">{item.exercise.name}</p><p className="mt-0.5 text-[9px] font-bold text-[var(--muted)]">{item.sets} serie{item.repMin ? ` · ${item.repMin}${item.repMax ? `–${item.repMax}` : ""} rip` : ""}</p></div><MediaPreview media={item.exercise.media} /></div>)}</div> : null}</div>)}
+              {activePlan.templates.map(template => <div key={template.id} className="py-4"><div className="flex min-h-12 items-center justify-between gap-4"><div className="min-w-0"><p className="text-[9px] font-black uppercase tracking-[0.18em] text-[var(--muted)]">Giorno {template.dayNumber}</p><p className="mt-1 truncate text-sm font-black sm:text-base">{template.name}</p></div><div className="flex shrink-0 items-center gap-2 text-[10px] font-bold text-[var(--muted)]"><span>{template._count.exercises} esercizi</span>{template.estimatedMins ? <span>· {template.estimatedMins} min</span> : null}</div></div>{template.exercises?.length ? <div className="mt-3 grid gap-2 sm:grid-cols-2">{template.exercises.map((item, index) => <div key={`${template.id}-${item.exercise.id}-${index}`} className="flex min-w-0 items-center gap-3 rounded-xl bg-[var(--surface)]/40 px-3 py-2.5"><span className="w-5 shrink-0 text-center text-[9px] font-black text-[var(--muted)]">{index + 1}</span><div className="min-w-0 flex-1"><p className="truncate text-xs font-black">{item.exercise.name}</p><p className="mt-0.5 text-[9px] font-bold text-[var(--muted)]">{item.sets} serie{item.repMin ? ` · ${item.repMin}${item.repMax ? `–${item.repMax}` : ""} rip` : ""}</p></div><MediaPreview media={item.exercise.media} slug={item.exercise.slug} /></div>)}</div> : null}</div>)}
             </div>
-            {currentPlan && <p className="mt-4 text-xs leading-5 text-[var(--muted)]">Le dimostrazioni disponibili provengono dal catalogo gratuito RepDB; il piano gratuito usa illustrazioni statiche WebP. Le animazioni appartengono al catalogo a pagamento.</p>}
+            {currentPlan && <p className="mt-4 text-xs leading-5 text-[var(--muted)]">Gli esercizi del piano usano esclusivamente il catalogo gratuito disponibile nell'app. Le dimostrazioni animate free sono mostrate direttamente dalla libreria locale degli esercizi.</p>}
           </section>
         )}
 

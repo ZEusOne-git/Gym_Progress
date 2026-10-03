@@ -12,8 +12,7 @@ function withPlanRegenerationFlag(value: string | null | undefined, pending: boo
     const parsed = JSON.parse(value ?? "{}");
     if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) preferences = parsed;
   } catch {
-    // Keep unrelated onboarding preferences if they are malformed by starting
-    // from a safe object; the setting update itself must remain usable.
+    // Keep unrelated onboarding preferences if they are malformed by starting from a safe object.
   }
   preferences[PLAN_REGENERATION_FLAG] = pending;
   return JSON.stringify(preferences);
@@ -29,7 +28,7 @@ export async function PUT(request: Request) {
   const form = body as Record<string, unknown>;
   const weight = Number(form.weight);
   const equipment = Array.isArray(form.equipment)
-    ? form.equipment.filter((item): item is string => typeof item === "string" && ALLOWED_EQUIPMENT.includes(item as (typeof ALLOWED_EQUIPMENT)[number]))
+    ? [...new Set(form.equipment.filter((item): item is string => typeof item === "string" && ALLOWED_EQUIPMENT.includes(item as (typeof ALLOWED_EQUIPMENT)[number])))]
     : [];
 
   if (!Number.isFinite(weight) || weight <= 0 || weight > 500) {
@@ -41,6 +40,17 @@ export async function PUT(request: Request) {
     prisma.onboardingResponse.findUnique({ where: { userId: user.id }, select: { equipmentJson: true, preferencesJson: true } }),
   ]);
 
+  const previousEquipment = (() => {
+    try {
+      const parsed = JSON.parse(previousOnboarding?.equipmentJson ?? "[]");
+      return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === "string").sort() : [];
+    } catch {
+      return [];
+    }
+  })();
+  const normalizedEquipment = [...equipment].sort();
+  const equipmentChanged = JSON.stringify(previousEquipment) !== JSON.stringify(normalizedEquipment);
+
   const profile = await prisma.profile.upsert({
     where: { userId: user.id },
     update: { currentWeight: weight },
@@ -51,15 +61,23 @@ export async function PUT(request: Request) {
     await prisma.weightLog.create({ data: { userId: user.id, weightKg: weight } });
   }
 
-  const previousEquipment = (() => {
-    try {
-      const parsed = JSON.parse(previousOnboarding?.equipmentJson ?? "[]");
-      return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === "string").sort() : [];
-    } catch {
-      return [];
-    }
-  })();
-  const equipmentChanged = JSON.stringify(previousEquipment) !== JSON.stringify([...equipment].sort());
+  // Persist the new equipment before regenerating. The generator reads the
+  // onboarding record, so generating first would accidentally use stale gear.
+  const onboarding = await prisma.onboardingResponse.upsert({
+    where: { userId: user.id },
+    update: {
+      equipmentJson: JSON.stringify(normalizedEquipment),
+      environment: equipment.length === ALLOWED_EQUIPMENT.length ? "COMMERCIAL_GYM" : "CUSTOM",
+      preferencesJson: withPlanRegenerationFlag(previousOnboarding?.preferencesJson, false),
+    },
+    create: {
+      userId: user.id,
+      environment: equipment.length === ALLOWED_EQUIPMENT.length ? "COMMERCIAL_GYM" : "CUSTOM",
+      equipmentJson: JSON.stringify(normalizedEquipment),
+      preferencesJson: withPlanRegenerationFlag("{}", false),
+      completedAt: new Date(),
+    },
+  });
 
   let planRegeneration: "updated" | "deferred" | "unchanged" = "unchanged";
   let planRegenerationPending = false;
@@ -78,29 +96,19 @@ export async function PUT(request: Request) {
         await generateAndAssignPlan(user.id);
         planRegeneration = "updated";
       } catch {
-        // Saving profile settings must remain possible if the current catalog
-        // cannot yet build a complete replacement for the new equipment.
         planRegeneration = "deferred";
         planRegenerationPending = true;
       }
     }
   }
 
-  const onboarding = await prisma.onboardingResponse.upsert({
-    where: { userId: user.id },
-    update: {
-      equipmentJson: JSON.stringify(equipment),
-      environment: equipment.length === ALLOWED_EQUIPMENT.length ? "COMMERCIAL_GYM" : "CUSTOM",
-      preferencesJson: withPlanRegenerationFlag(previousOnboarding?.preferencesJson, planRegenerationPending),
-    },
-    create: {
-      userId: user.id,
-      environment: equipment.length === ALLOWED_EQUIPMENT.length ? "COMMERCIAL_GYM" : "CUSTOM",
-      equipmentJson: JSON.stringify(equipment),
-      preferencesJson: withPlanRegenerationFlag("{}", planRegenerationPending),
-      completedAt: new Date(),
-    },
-  });
+  if (planRegenerationPending) {
+    const updatedOnboarding = await prisma.onboardingResponse.update({
+      where: { userId: user.id },
+      data: { preferencesJson: withPlanRegenerationFlag(onboarding.preferencesJson, true) },
+    });
+    return NextResponse.json({ profile, equipment, onboarding: updatedOnboarding, planRegeneration });
+  }
 
   return NextResponse.json({ profile, equipment, onboarding, planRegeneration });
 }

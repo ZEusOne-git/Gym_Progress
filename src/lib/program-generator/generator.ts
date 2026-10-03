@@ -5,27 +5,19 @@ import type { GeneratedDay, GeneratedExercise, PlanPreferences, ExerciseCandidat
 const prescriptionFor = (preferences: PlanPreferences) => {
   const beginner = preferences.experience === "BEGINNER";
   const advanced = preferences.experience === "ADVANCED";
-
   switch (preferences.goal) {
-    case "STRENGTH":
-      return { sets: beginner ? 3 : 4, repMin: 4, repMax: advanced ? 7 : 8, rir: advanced ? 1 : 2, restSeconds: 150 };
-    case "GENERAL_FITNESS":
-      return { sets: beginner ? 2 : 3, repMin: 8, repMax: 15, rir: 3, restSeconds: 90 };
-    case "RECOMPOSITION":
-      return { sets: beginner ? 2 : 3, repMin: 8, repMax: 12, rir: 2, restSeconds: 90 };
+    case "STRENGTH": return { sets: beginner ? 3 : 4, repMin: 4, repMax: advanced ? 7 : 8, rir: advanced ? 1 : 2, restSeconds: 150 };
+    case "GENERAL_FITNESS": return { sets: beginner ? 2 : 3, repMin: 8, repMax: 15, rir: 3, restSeconds: 90 };
+    case "RECOMPOSITION": return { sets: beginner ? 2 : 3, repMin: 8, repMax: 12, rir: 2, restSeconds: 90 };
     case "HYPERTROPHY":
-    default:
-      return { sets: beginner ? 2 : advanced ? 4 : 3, repMin: 6, repMax: 12, rir: 2, restSeconds: 90 };
+    default: return { sets: beginner ? 2 : advanced ? 4 : 3, repMin: 6, repMax: 12, rir: 2, restSeconds: 90 };
   }
 };
 
 const aliases: Record<string, MusclePriority> = { BICEPS: "ARMS", TRICEPS: "ARMS", ABS: "CORE" };
 const normalizedMuscles = (groups: MusclePriority[]) => groups.map((group) => aliases[group] ?? group);
 const goalNames: Record<PlanPreferences["goal"], string> = {
-  HYPERTROPHY: "Ipertrofia",
-  STRENGTH: "Forza",
-  RECOMPOSITION: "Ricomp",
-  GENERAL_FITNESS: "Fitness",
+  HYPERTROPHY: "Ipertrofia", STRENGTH: "Forza", RECOMPOSITION: "Ricomp", GENERAL_FITNESS: "Fitness",
 };
 
 function coverageScore(candidate: ExerciseCandidate, focus: MusclePriority[], priorities: Set<MusclePriority>, counts: Map<MusclePriority, number>, usedThisWeek: Map<string, number>) {
@@ -59,11 +51,7 @@ function pickBest(pool: ExerciseCandidate[], selected: ExerciseCandidate[], focu
   return pool
     .filter((candidate) => !selected.some((item) => item.id === candidate.id))
     .filter((candidate) => !muscle || normalizedMuscles(candidate.muscleGroups).includes(muscle))
-    .sort((a, b) => {
-      const scoreDifference = coverageScore(b, focus, priorities, counts, usedThisWeek) - coverageScore(a, focus, priorities, counts, usedThisWeek);
-      if (scoreDifference !== 0) return scoreDifference;
-      return (usedThisWeek.get(a.id) ?? 0) - (usedThisWeek.get(b.id) ?? 0);
-    })[0];
+    .sort((a, b) => coverageScore(b, focus, priorities, counts, usedThisWeek) - coverageScore(a, focus, priorities, counts, usedThisWeek) || (usedThisWeek.get(a.id) ?? 0) - (usedThisWeek.get(b.id) ?? 0) || a.id.localeCompare(b.id))[0];
 }
 
 export function generatePlan(preferences: PlanPreferences, candidates: ExerciseCandidate[]): { name: string; days: GeneratedDay[] } {
@@ -75,7 +63,7 @@ export function generatePlan(preferences: PlanPreferences, candidates: ExerciseC
 
   const days = split.map((splitDay) => {
     const focus = [...splitDay.focus].sort((a, b) => Number(priorities.has(b)) - Number(priorities.has(a)));
-    const pool = selectExercises(candidates, preferences, focus, candidates.length);
+    const pool = selectExercises(candidates, preferences, focus, Math.max(candidates.length, exercisesPerDay * 4));
     const selected: ExerciseCandidate[] = [];
     const counts = new Map<MusclePriority, number>();
 
@@ -84,13 +72,11 @@ export function generatePlan(preferences: PlanPreferences, candidates: ExerciseC
       const match = pickBest(pool, selected, focus, priorities, counts, usedThisWeek, priority);
       if (match) addCandidate(match, selected, counts);
     }
-
     for (const muscle of focus) {
       if (selected.length >= exercisesPerDay) break;
       const match = pickBest(pool, selected, focus, priorities, counts, usedThisWeek, muscle);
       if (match) addCandidate(match, selected, counts);
     }
-
     while (selected.length < exercisesPerDay) {
       const unused = pool.filter((candidate) => (usedThisWeek.get(candidate.id) ?? 0) === 0);
       const next = pickBest(unused.length ? unused : pool, selected, focus, priorities, counts, usedThisWeek);
@@ -105,9 +91,7 @@ export function generatePlan(preferences: PlanPreferences, candidates: ExerciseC
       const sets = isPriority && !accessory && preferences.experience !== "BEGINNER" ? prescription.sets + 1 : prescription.sets;
       return { exerciseId: candidate.id, sets, repMin: prescription.repMin, repMax: prescription.repMax, rir: prescription.rir, restSeconds: prescription.restSeconds };
     });
-
-    return { ...splitDay, name: splitDay.name, exercises };
+    return { ...splitDay, exercises };
   });
-
   return { name: `${goalNames[preferences.goal]} · ${preferences.trainingDays} giorni`, days };
 }

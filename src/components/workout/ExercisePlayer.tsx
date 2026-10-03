@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
 
 export type Exercise = {
   name: string;
@@ -68,7 +67,13 @@ export default function ExercisePlayer({ exercise, exerciseIndex, totalExercises
         <div className="relative min-h-0 flex-1 bg-black">
           {exercise.mediaUrl ? (
             exercise.mediaType === "IMAGE" || exercise.mediaType === "GIF" ? (
-              <Image src={exercise.mediaUrl} alt={exercise.name} fill unoptimized sizes="(max-width: 430px) 100vw, 430px" className="bg-[#0b1513] object-contain" />
+              <img
+                src={exercise.mediaUrl}
+                alt={exercise.name}
+                loading="eager"
+                decoding="async"
+                className="h-full w-full bg-[#0b1513] object-contain"
+              />
             ) : (
               <video
                 ref={videoRef}

@@ -3,11 +3,12 @@ import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { generateAndAssignPlan } from "@/lib/program-generator";
 
-const GOAL_MAP: Record<string, "FAT_LOSS" | "MUSCLE_GAIN" | "RECOMPOSITION" | "STRENGTH"> = {
+const GOAL_MAP: Record<string, "FAT_LOSS" | "MUSCLE_GAIN" | "RECOMPOSITION" | "STRENGTH" | "GENERAL_FITNESS"> = {
   "RECOMP": "RECOMPOSITION",
   "FAT LOSS": "FAT_LOSS",
   "MUSCLE": "MUSCLE_GAIN",
   "STRENGTH": "STRENGTH",
+  "GENERAL FITNESS": "GENERAL_FITNESS",
 };
 
 const MUSCLE_MAP: Record<string, string> = {

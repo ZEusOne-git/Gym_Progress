@@ -49,45 +49,42 @@ const programs = [
 ];
 
 try {
-  const exercises = await prisma.exercise.findMany({ where: { isActive: true }, select: { id: true, slug: true } });
+  const exercises = await prisma.exercise.findMany({ where: { isActive: true, slug: { in: [...FREE_EXERCISE_SET] } }, select: { id: true, slug: true } });
   const exerciseIds = new Map(exercises.map(item => [item.slug, item.id]));
 
   for (const program of programs) {
-    const existing = await prisma.workoutPlan.findFirst({ where: { name: program.name, userId: null, isTemplate: true }, select: { id: true } });
-    if (existing) {
-      console.log(`Kept existing program (admin edits preserved): ${program.name}`);
-      continue;
-    }
-
     const usedSlugs = program.days.flatMap(day => day.exercises.map(item => item.slug));
     const missing = [...new Set(usedSlugs)].filter(slug => !FREE_EXERCISE_SET.has(slug) || !exerciseIds.has(slug));
-    if (missing.length) throw new Error(`Cannot seed ${program.name}; unsupported/missing exercises: ${missing.join(", ")}`);
+    if (missing.length) throw new Error(`Cannot sync ${program.name}; unsupported/missing exercises: ${missing.join(", ")}`);
+
+    const existing = await prisma.workoutPlan.findFirst({ where: { name: program.name, userId: null, isTemplate: true }, select: { id: true } });
+    if (existing) {
+      await prisma.workoutTemplate.deleteMany({ where: { workoutPlanId: existing.id } });
+      await prisma.workoutPlan.update({
+        where: { id: existing.id },
+        data: {
+          isActive: false,
+          version: { increment: 1 },
+          templates: {
+            create: program.days.map((day, dayIndex) => ({
+              dayNumber: dayIndex + 1,
+              name: day.name,
+              estimatedMins: day.estimatedMins,
+              exercises: { create: day.exercises.map((item, orderIndex) => ({ exerciseId: exerciseIds.get(item.slug), orderIndex, sets: item.sets, repMin: item.repMin, repMax: item.repMax, rirTarget: 2, restSeconds: item.restSeconds, progressionType: "DOUBLE_PROGRESSION", loadIncrement: item.loadIncrement })) },
+            })),
+          },
+        },
+      });
+      console.log(`Synced existing program: ${program.name}`);
+      continue;
+    }
 
     await prisma.workoutPlan.create({
       data: {
         name: program.name,
         isTemplate: true,
         isActive: false,
-        templates: {
-          create: program.days.map((day, dayIndex) => ({
-            dayNumber: dayIndex + 1,
-            name: day.name,
-            estimatedMins: day.estimatedMins,
-            exercises: {
-              create: day.exercises.map((item, orderIndex) => ({
-                exerciseId: exerciseIds.get(item.slug),
-                orderIndex,
-                sets: item.sets,
-                repMin: item.repMin,
-                repMax: item.repMax,
-                rirTarget: 2,
-                restSeconds: item.restSeconds,
-                progressionType: "DOUBLE_PROGRESSION",
-                loadIncrement: item.loadIncrement,
-              })),
-            },
-          })),
-        },
+        templates: { create: program.days.map((day, dayIndex) => ({ dayNumber: dayIndex + 1, name: day.name, estimatedMins: day.estimatedMins, exercises: { create: day.exercises.map((item, orderIndex) => ({ exerciseId: exerciseIds.get(item.slug), orderIndex, sets: item.sets, repMin: item.repMin, repMax: item.repMax, rirTarget: 2, restSeconds: item.restSeconds, progressionType: "DOUBLE_PROGRESSION", loadIncrement: item.loadIncrement })) } })) },
       },
     });
     console.log(`Created initial program: ${program.name}`);

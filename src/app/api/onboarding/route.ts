@@ -15,11 +15,17 @@ const MUSCLE_MAP: Record<string, string> = {
   Quads: "QUADS", Hamstrings: "HAMSTRINGS", Calves: "CALVES", "Lower back": "LOWER_BACK",
 };
 const ALLOWED_EQUIPMENT = ["machines", "barbells", "free_weights", "cardio"] as const;
+const ALLOWED_SESSION_MINUTES = [30, 45, 60, 75, 90] as const;
 
 function numberOrNull(value: unknown) {
   if (value === "" || value === null || value === undefined) return null;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+function sessionMinutesOrNull(value: unknown) {
+  const parsed = numberOrNull(value);
+  return parsed !== null && ALLOWED_SESSION_MINUTES.includes(parsed as (typeof ALLOWED_SESSION_MINUTES)[number]) ? parsed : null;
 }
 
 export async function GET() {
@@ -50,6 +56,7 @@ export async function PUT(request: Request) {
   const heightCm = numberOrNull(form.height);
   const currentWeight = numberOrNull(form.weight);
   const trainingDays = numberOrNull(form.days);
+  const sessionMinutes = sessionMinutesOrNull(form.sessionMinutes ?? form.duration ?? form.workoutDuration);
   const goal = typeof form.goal === "string" ? GOAL_MAP[form.goal] : undefined;
   const priorities = Array.isArray(form.priorities) ? form.priorities.filter((item): item is string => typeof item === "string") : [];
   const equipment = Array.isArray(form.equipment)
@@ -65,9 +72,10 @@ export async function PUT(request: Request) {
     update: {
       ...(firstName !== undefined ? { firstName } : {}), ...(age !== null ? { age } : {}), ...(heightCm !== null ? { heightCm } : {}),
       ...(currentWeight !== null ? { currentWeight } : {}), ...(trainingDays !== null ? { trainingDays } : {}),
+      ...(sessionMinutes !== null ? { sessionMinutes } : {}),
       ...(typeof form.experience === "string" ? { experience: form.experience } : {}),
     },
-    create: { userId: user.id, firstName: firstName || null, age, heightCm, currentWeight, trainingDays, experience: typeof form.experience === "string" ? form.experience : null },
+    create: { userId: user.id, firstName: firstName || null, age, heightCm, currentWeight, trainingDays, sessionMinutes, experience: typeof form.experience === "string" ? form.experience : null },
   });
 
   const onboarding = await prisma.onboardingResponse.upsert({

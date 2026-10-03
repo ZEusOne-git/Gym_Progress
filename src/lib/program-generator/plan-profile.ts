@@ -8,6 +8,8 @@ export function normalizePlanPreferences(input: Partial<PlanPreferences>): PlanP
   const trainingDays = ([2, 3, 4, 5, 6] as const).includes(days as 2 | 3 | 4 | 5 | 6) ? days as PlanPreferences["trainingDays"] : 3;
   const goal = GOALS.includes(input.goal as TrainingGoal) ? input.goal as TrainingGoal : "GENERAL_FITNESS";
   const experience = EXPERIENCE.includes(input.experience as ExperienceLevel) ? input.experience as ExperienceLevel : "BEGINNER";
+  const rawMinutes = Number(input.sessionMinutes);
+  const sessionMinutes = Number.isFinite(rawMinutes) && rawMinutes > 0 ? Math.min(120, Math.max(20, Math.round(rawMinutes))) : 45;
 
   return {
     trainingDays,
@@ -15,6 +17,7 @@ export function normalizePlanPreferences(input: Partial<PlanPreferences>): PlanP
     goal,
     equipment: Array.from(new Set(input.equipment ?? [])),
     priorities: Array.from(new Set(input.priorities ?? [])),
+    sessionMinutes,
   };
 }
 

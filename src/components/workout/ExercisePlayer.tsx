@@ -14,6 +14,8 @@ export type Exercise = {
   cues: string[];
   mediaUrl?: string | null;
   mediaType?: string | null;
+  attribution?: string | null;
+  sourceUrl?: string | null;
 };
 
 type Props = {
@@ -92,6 +94,7 @@ export default function ExercisePlayer({ exercise, exerciseIndex, totalExercises
           <div className="mx-auto mb-4 h-1 w-9 rounded-full bg-white/15" />
           <div className="text-center">
             <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-white/40">{exercise.name}</p>
+            {exercise.attribution && <a href={exercise.sourceUrl || "https://repdb.co"} target="_blank" rel="noreferrer" className="mt-1 inline-flex text-[9px] font-semibold text-white/45 underline decoration-white/25 underline-offset-2">Illustrazione: {exercise.attribution}</a>}
             <p className="mt-2 text-[46px] font-light leading-none tracking-[-0.04em] tabular-nums">{timer}</p>
             <div className="mt-2 flex items-center justify-center gap-2 text-[11px] font-semibold text-white/55">
               <span>Serie {setProgress}</span><span className="h-1 w-1 rounded-full bg-white/25" /><span>{exercise.reps} reps</span>

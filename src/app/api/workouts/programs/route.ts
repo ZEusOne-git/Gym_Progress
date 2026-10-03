@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { findAlternativeExercise, isEquipmentCompatible, parseEquipment } from "@/lib/equipment";
+import { FREE_EXERCISE_SET } from "@/lib/program-generator/free-exercise-catalog";
 import type { Prisma } from "@prisma/client";
 
 function weekdaysFor(count: number) {
@@ -93,8 +94,8 @@ export async function POST(request: Request) {
 
   const [onboarding, source, catalog] = await Promise.all([
     prisma.onboardingResponse.findUnique({ where: { userId: user.id }, select: { equipmentJson: true } }),
-    prisma.workoutPlan.findFirst({ where: { id: templatePlanId, isTemplate: true, isActive: true, OR: [{ userId: null }, { userId: user.id }] }, include: { templates: { orderBy: { dayNumber: "asc" }, include: { exercises: { orderBy: { orderIndex: "asc" }, include: { exercise: { select: { id: true, name: true, category: true, primaryMuscles: true, equipment: true, difficulty: true, isActive: true } } } } } } } }),
-    prisma.exercise.findMany({ where: { isActive: true }, select: { id: true, category: true, primaryMuscles: true, equipment: true, difficulty: true } }),
+    prisma.workoutPlan.findFirst({ where: { id: templatePlanId, isTemplate: true, isActive: true, OR: [{ userId: null }, { userId: user.id }] }, include: { templates: { orderBy: { dayNumber: "asc" }, include: { exercises: { orderBy: { orderIndex: "asc" }, include: { exercise: { select: { id: true, name: true, category: true, primaryMuscles: true, equipment: true, difficulty: true, isActive: true, slug: true } } } } } } } }),
+    prisma.exercise.findMany({ where: { isActive: true, slug: { in: [...FREE_EXERCISE_SET] } }, select: { id: true, slug: true, category: true, primaryMuscles: true, equipment: true, difficulty: true } }),
   ]);
   if (!source) return NextResponse.json({ error: "Programma consigliato non disponibile." }, { status: 404 });
 
@@ -103,13 +104,13 @@ export async function POST(request: Request) {
   const resolvedExercises = new Map<string, string>();
   const incompatible: string[] = [];
   for (const template of source.templates) for (const item of template.exercises) {
-    if (!item.exercise.isActive) { incompatible.push(item.exercise.name); continue; }
+    if (!item.exercise.isActive || !FREE_EXERCISE_SET.has(item.exercise.slug)) { incompatible.push(item.exercise.name); continue; }
     const requirements = parseEquipment(item.exercise.equipment);
     if (isEquipmentCompatible(requirements, available)) { resolvedExercises.set(item.id, item.exercise.id); continue; }
     const alternative = findAlternativeExercise(item.exercise, catalog, available);
     if (alternative) { resolvedExercises.set(item.id, alternative.id); adaptations.push({ from: item.exercise.id, to: alternative.id }); } else incompatible.push(item.exercise.name);
   }
-  if (incompatible.length) return NextResponse.json({ error: `Non è possibile assegnare questo programma con l'attrezzatura disponibile. Esercizi da correggere: ${[...new Set(incompatible)].join(", ")}.` }, { status: 409 });
+  if (incompatible.length) return NextResponse.json({ error: `Non è possibile assegnare questo programma con l'attrezzatura disponibile o con il catalogo free fornito. Esercizi da correggere: ${[...new Set(incompatible)].join(", ")}.` }, { status: 409 });
 
   const count = Math.max(1, Math.min(source.templates.length, 7));
   const weekdays = weekdaysFor(count);

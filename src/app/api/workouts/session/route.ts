@@ -17,10 +17,7 @@ export async function GET(request: Request) {
   const templateId = url.searchParams.get("template");
   const scheduledDate = parseDate(url.searchParams.get("date"));
   if (!templateId) return NextResponse.json({ session: null });
-
-  const schedule = scheduledDate
-    ? await prisma.workoutSchedule.findFirst({ where: { userId: user.id, templateId, scheduledDate }, select: { id: true } })
-    : null;
+  const schedule = scheduledDate ? await prisma.workoutSchedule.findFirst({ where: { userId: user.id, templateId, scheduledDate }, select: { id: true } }) : null;
   const session = schedule
     ? await prisma.workoutSession.findFirst({ where: { userId: user.id, scheduleId: schedule.id, completedAt: null }, orderBy: { startedAt: "desc" }, select: { id: true, startedAt: true, pausedAt: true, elapsedSeconds: true, sets: { orderBy: [{ exerciseId: "asc" }, { setNumber: "asc" }], select: { id: true, exerciseId: true, setNumber: true, weight: true, reps: true, rir: true, completed: true } } } })
     : await prisma.workoutSession.findFirst({ where: { userId: user.id, completedAt: null, plan: { isActive: true, isTemplate: false, templates: { some: { id: templateId } } } }, orderBy: { startedAt: "desc" }, select: { id: true, startedAt: true, pausedAt: true, elapsedSeconds: true, sets: { orderBy: [{ exerciseId: "asc" }, { setNumber: "asc" }], select: { id: true, exerciseId: true, setNumber: true, weight: true, reps: true, rir: true, completed: true } } } });
@@ -36,11 +33,8 @@ export async function POST(request: Request) {
     if (!templateId) return NextResponse.json({ error: "Workout non valido." }, { status: 400 });
     const template = await prisma.workoutTemplate.findFirst({ where: { id: templateId, plan: { userId: user.id, isActive: true, isTemplate: false } }, select: { id: true, workoutPlanId: true } });
     if (!template) return NextResponse.json({ error: "Workout non disponibile." }, { status: 404 });
-
     const scheduledDate = parseDate(body.date);
-    const schedule = scheduledDate
-      ? await prisma.workoutSchedule.findFirst({ where: { userId: user.id, workoutPlanId: template.workoutPlanId, templateId: template.id, scheduledDate }, select: { id: true } })
-      : null;
+    const schedule = scheduledDate ? await prisma.workoutSchedule.findFirst({ where: { userId: user.id, workoutPlanId: template.workoutPlanId, templateId: template.id, scheduledDate }, select: { id: true } }) : null;
 
     if (schedule) {
       const existingScheduled = await prisma.workoutSession.findUnique({ where: { scheduleId: schedule.id }, select: { id: true, userId: true, startedAt: true, pausedAt: true, elapsedSeconds: true, completedAt: true, endedEarly: true } });
@@ -92,7 +86,7 @@ export async function PATCH(request: Request) {
       if (session.pausedAt) return NextResponse.json({ ok: true, paused: true, session: { id: session.id, startedAt: session.startedAt, pausedAt: session.pausedAt, elapsedSeconds: session.elapsedSeconds } });
       const now = new Date();
       const additionalSeconds = Math.max(0, Math.floor((now.getTime() - session.startedAt.getTime()) / 1000));
-      const paused = await prisma.workoutSession.update({ where: { id: session.id }, data: { pausedAt: now, elapsedSeconds: { increment: additionalSeconds } }, select: { id: session.id, startedAt: true, pausedAt: true, elapsedSeconds: true } });
+      const paused = await prisma.workoutSession.update({ where: { id: session.id }, data: { pausedAt: now, elapsedSeconds: { increment: additionalSeconds } }, select: { id: true, startedAt: true, pausedAt: true, elapsedSeconds: true } });
       return NextResponse.json({ ok: true, paused: true, session: paused });
     }
     if (session.pausedAt) return NextResponse.json({ error: "Allenamento in pausa. Riprendilo prima di completarlo." }, { status: 400 });

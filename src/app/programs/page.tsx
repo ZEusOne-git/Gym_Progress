@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, ArrowRight, CalendarDays, Check, ChevronRight, Dumbbell, Sparkles } from "lucide-react";
+import { ArrowLeft, ArrowRight, CalendarDays, Check, ChevronRight, Dumbbell, ExternalLink, Image as ImageIcon, Play, Sparkles } from "lucide-react";
 
-type Exercise = { exercise: { id: string; name: string; equipment: string }; sets: number; repMin: number | null; repMax: number | null };
+type ExerciseMedia = { type: "VIDEO" | "WEBM" | "GIF" | "IMAGE"; url: string; thumbnailUrl: string | null; sourceName: string | null; sourceUrl: string | null; attribution: string | null };
+type Exercise = { exercise: { id: string; name: string; slug?: string; equipment: string; media?: ExerciseMedia[] }; sets: number; repMin: number | null; repMax: number | null };
 type Plan = {
   id: string;
   name: string;
@@ -14,6 +15,18 @@ type Plan = {
 };
 
 type GeneratedPlan = Plan & { isTemplate: false };
+
+function MediaPreview({ media }: { media?: ExerciseMedia[] }) {
+  const primary = media?.[0];
+  if (!primary) return <span className="inline-flex items-center gap-1 rounded-full border border-[var(--border)] px-2 py-1 text-[8px] font-black uppercase tracking-[0.12em] text-[var(--muted)]">Scheda senza video</span>;
+  const isPlayable = ["VIDEO", "WEBM", "GIF"].includes(primary.type);
+  return (
+    <a href={primary.url} target="_blank" rel="noreferrer" className="group relative block h-14 w-20 shrink-0 overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)]">
+      {primary.thumbnailUrl || primary.type === "IMAGE" ? <img src={primary.thumbnailUrl || primary.url} alt="" className="h-full w-full object-cover transition group-hover:scale-105" /> : <div className="flex h-full items-center justify-center"><Play size={18} /></div>}
+      <span className="absolute inset-x-0 bottom-0 bg-black/65 px-1.5 py-1 text-[7px] font-black uppercase tracking-[0.08em] text-white">{isPlayable ? "Video" : "Immagine"}</span>
+    </a>
+  );
+}
 
 export default function ProgramsPage() {
   const [plans, setPlans] = useState<Plan[]>([]);
@@ -71,56 +84,23 @@ export default function ProgramsPage() {
             <div className="flex items-start gap-3">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[var(--accent)] text-[var(--accent-foreground)]"><Check size={18} strokeWidth={3} /></div>
               <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--accent)]">PROGRAMMA ATTIVO</p>
-                  {currentPlan && <span className="rounded-full border border-[var(--accent)]/30 px-2 py-1 text-[8px] font-black uppercase tracking-[0.14em] text-[var(--accent)]">Personalizzato</span>}
-                </div>
+                <div className="flex flex-wrap items-center gap-2"><p className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--accent)]">PROGRAMMA ATTIVO</p>{currentPlan && <span className="rounded-full border border-[var(--accent)]/30 px-2 py-1 text-[8px] font-black uppercase tracking-[0.14em] text-[var(--accent)]">Personalizzato</span>}</div>
                 <p className="mt-1 truncate text-xl font-black">{activePlan.name}</p>
                 <p className="mt-1 text-sm text-[var(--muted)]">{activePlan.templates.length} giorni · {activeExerciseCount} esercizi · calendario generato per 12 settimane</p>
               </div>
             </div>
-
-            {currentPlan && <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-3">
-              <Link href="/calendar" className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-4 py-3 text-xs font-black text-[var(--accent-foreground)]"><CalendarDays size={16} /> VEDI CALENDARIO</Link>
-              <Link href="/workout/active" className="flex min-h-12 items-center justify-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-xs font-black"><Dumbbell size={16} /> ALLENATI</Link>
-              <Link href="/onboarding?edit=1" className="col-span-2 flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[var(--border)] px-4 py-3 text-xs font-bold text-[var(--muted)] sm:col-span-1">MODIFICA PROFILO <ArrowRight size={14} /></Link>
-            </div>}
-
+            {currentPlan && <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-3"><Link href="/calendar" className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-4 py-3 text-xs font-black text-[var(--accent-foreground)]"><CalendarDays size={16} /> VEDI CALENDARIO</Link><Link href="/workout/active" className="flex min-h-12 items-center justify-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-xs font-black"><Dumbbell size={16} /> ALLENATI</Link><Link href="/onboarding?edit=1" className="col-span-2 flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[var(--border)] px-4 py-3 text-xs font-bold text-[var(--muted)] sm:col-span-1">MODIFICA PROFILO <ArrowRight size={14} /></Link></div>}
             <div className="mt-5 divide-y divide-[var(--border)] border-y border-[var(--border)]">
-              {activePlan.templates.map(template => (
-                <div key={template.id} className="py-4">
-                  <div className="flex min-h-12 items-center justify-between gap-4">
-                    <div className="min-w-0"><p className="text-[9px] font-black uppercase tracking-[0.18em] text-[var(--muted)]">Giorno {template.dayNumber}</p><p className="mt-1 truncate text-sm font-black sm:text-base">{template.name}</p></div>
-                    <div className="flex shrink-0 items-center gap-2 text-[10px] font-bold text-[var(--muted)]"><span>{template._count.exercises} esercizi</span>{template.estimatedMins ? <span>· {template.estimatedMins} min</span> : null}</div>
-                  </div>
-                  {template.exercises?.length ? <div className="mt-3 grid gap-x-4 gap-y-2 sm:grid-cols-2">{template.exercises.map((item, index) => <div key={`${template.id}-${item.exercise.id}-${index}`} className="flex min-w-0 items-center gap-3 rounded-xl bg-[var(--surface)]/40 px-3 py-2.5"><span className="w-5 shrink-0 text-center text-[9px] font-black text-[var(--muted)]">{index + 1}</span><div className="min-w-0 flex-1"><p className="truncate text-xs font-black">{item.exercise.name}</p><p className="mt-0.5 text-[9px] font-bold text-[var(--muted)]">{item.sets} serie{item.repMin ? ` · ${item.repMin}${item.repMax ? `–${item.repMax}` : ""} rip` : ""}</p></div></div>)}</div> : null}
-                </div>
-              ))}
+              {activePlan.templates.map(template => <div key={template.id} className="py-4"><div className="flex min-h-12 items-center justify-between gap-4"><div className="min-w-0"><p className="text-[9px] font-black uppercase tracking-[0.18em] text-[var(--muted)]">Giorno {template.dayNumber}</p><p className="mt-1 truncate text-sm font-black sm:text-base">{template.name}</p></div><div className="flex shrink-0 items-center gap-2 text-[10px] font-bold text-[var(--muted)]"><span>{template._count.exercises} esercizi</span>{template.estimatedMins ? <span>· {template.estimatedMins} min</span> : null}</div></div>{template.exercises?.length ? <div className="mt-3 grid gap-2 sm:grid-cols-2">{template.exercises.map((item, index) => <div key={`${template.id}-${item.exercise.id}-${index}`} className="flex min-w-0 items-center gap-3 rounded-xl bg-[var(--surface)]/40 px-3 py-2.5"><span className="w-5 shrink-0 text-center text-[9px] font-black text-[var(--muted)]">{index + 1}</span><div className="min-w-0 flex-1"><p className="truncate text-xs font-black">{item.exercise.name}</p><p className="mt-0.5 text-[9px] font-bold text-[var(--muted)]">{item.sets} serie{item.repMin ? ` · ${item.repMin}${item.repMax ? `–${item.repMax}` : ""} rip` : ""}</p></div><MediaPreview media={item.exercise.media} /></div>)}</div> : null}</div>)}
             </div>
-            {currentPlan && <p className="mt-4 text-xs leading-5 text-[var(--muted)]">Questo piano è stato generato per il tuo profilo e viene usato direttamente per il calendario. Non è necessario scegliere un altro programma.</p>}
+            {currentPlan && <p className="mt-4 text-xs leading-5 text-[var(--muted)]">Gli esercizi vengono mostrati con il media gratuito disponibile; quando non c'è un video resta disponibile la scheda esercizio.</p>}
           </section>
         )}
 
         {message && <div className="mt-5 rounded-2xl border border-[var(--accent)]/25 bg-[var(--accent)]/10 px-4 py-3 text-sm font-bold text-[var(--accent)]">{message}</div>}
         {error && <div className="mt-5 rounded-2xl border border-red-500/25 bg-red-500/10 px-4 py-3 text-sm font-bold text-red-400">{error}</div>}
 
-        <section className="mt-10">
-          <div className="flex items-end justify-between gap-4"><div><p className="text-[10px] font-black uppercase tracking-[0.25em] text-[var(--muted)]">CATALOGO</p><h2 className="mt-1 text-xl font-black tracking-[-0.03em]">Altri programmi disponibili</h2></div><span className="text-[10px] font-bold text-[var(--muted)]">{plans.length}</span></div>
-          <div className="mt-5 space-y-4">
-            {plans.map((plan, index) => {
-              const active = current?.id === plan.id || current?.name === plan.name;
-              const matchesDays = plan.trainingDaysFit !== false;
-              const totalExercises = plan.templates.reduce((total, t) => total + t._count.exercises, 0);
-              const isRecommended = index === 0 || (matchesDays && plan.equipmentFit?.percent === 100);
-              return <article key={plan.id} className={"border-y border-[var(--border)] transition-colors " + (active ? "border-y-[var(--accent)]/35" : "")}>
-                <div className="py-5 sm:py-7">
-                  <div className="flex items-start justify-between gap-4"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--accent)]">{isRecommended ? <Sparkles size={14} /> : <Dumbbell size={14} />}{active ? "Attivo" : isRecommended ? "Consigliato" : "Disponibile"}</div><h3 className="mt-3 text-2xl font-black tracking-[-0.04em] sm:text-3xl">{plan.name}</h3><p className="mt-2 text-sm text-[var(--muted)]">{plan.templates.length} giorni · {totalExercises} esercizi</p>{preferredTrainingDays !== null && !matchesDays && <p className="mt-2 text-xs font-bold text-amber-300">Prevede {plan.templates.length} giorni, mentre il tuo profilo ne indica {preferredTrainingDays}.</p>}{plan.equipmentFit && <p className={"mt-3 text-[10px] font-black uppercase tracking-[0.14em] " + (plan.equipmentFit.unsupported.length ? "text-amber-300" : "text-[var(--accent)]")}>{plan.equipmentFit.unsupported.length ? `${plan.equipmentFit.percent}% compatibile con i tuoi attrezzi` : "Compatibile con i tuoi attrezzi"}</p>}</div>{active && <span className="shrink-0 rounded-full bg-[var(--accent)] px-3 py-1.5 text-[9px] font-black text-[var(--accent-foreground)]">ATTIVO</span>}</div>
-                  <div className="mt-6 divide-y divide-[var(--border)] border-y border-[var(--border)]">{plan.templates.map(template => <div key={template.id} className="flex min-h-16 items-center justify-between gap-4 py-3.5"><div className="min-w-0"><p className="text-[9px] font-black uppercase tracking-[0.18em] text-[var(--muted)]">Giorno {template.dayNumber}</p><p className="mt-1 truncate text-sm font-black sm:text-base">{template.name}</p></div><div className="flex shrink-0 items-center gap-2 text-[10px] font-bold text-[var(--muted)]"><span>{template._count.exercises} esercizi</span>{template.estimatedMins ? <span>· {template.estimatedMins} min</span> : null}<ChevronRight size={14} /></div></div>)}</div>
-                  {!active && <button type="button" onClick={() => choose(plan.id)} disabled={saving !== null} className="mt-5 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-5 py-3.5 text-sm font-black text-[var(--accent-foreground)] transition active:scale-[.985] disabled:cursor-wait disabled:opacity-60">{saving === plan.id ? "AGGIORNAMENTO..." : isRecommended ? "SCEGLI PROGRAMMA CONSIGLIATO" : "SCEGLI PROGRAMMA"}</button>}
-                </div></article>;
-            })}
-          </div>
-        </section>
+        <section className="mt-10"><div className="flex items-end justify-between gap-4"><div><p className="text-[10px] font-black uppercase tracking-[0.25em] text-[var(--muted)]">CATALOGO</p><h2 className="mt-1 text-xl font-black tracking-[-0.03em]">Altri programmi disponibili</h2></div><span className="text-[10px] font-bold text-[var(--muted)]">{plans.length}</span></div><div className="mt-5 space-y-4">{plans.map((plan, index) => { const active = current?.id === plan.id || current?.name === plan.name; const matchesDays = plan.trainingDaysFit !== false; const totalExercises = plan.templates.reduce((total, t) => total + t._count.exercises, 0); const isRecommended = index === 0 || (matchesDays && plan.equipmentFit?.percent === 100); return <article key={plan.id} className={"border-y border-[var(--border)] transition-colors " + (active ? "border-y-[var(--accent)]/35" : "")}><div className="py-5 sm:py-7"><div className="flex items-start justify-between gap-4"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--accent)]">{isRecommended ? <Sparkles size={14} /> : <Dumbbell size={14} />}{active ? "Attivo" : isRecommended ? "Consigliato" : "Disponibile"}</div><h3 className="mt-3 text-2xl font-black tracking-[-0.04em] sm:text-3xl">{plan.name}</h3><p className="mt-2 text-sm text-[var(--muted)]">{plan.templates.length} giorni · {totalExercises} esercizi</p>{preferredTrainingDays !== null && !matchesDays && <p className="mt-2 text-xs font-bold text-amber-300">Prevede {plan.templates.length} giorni, mentre il tuo profilo ne indica {preferredTrainingDays}.</p>}{plan.equipmentFit && <p className={"mt-3 text-[10px] font-black uppercase tracking-[0.14em] " + (plan.equipmentFit.unsupported.length ? "text-amber-300" : "text-[var(--accent)]")}>{plan.equipmentFit.unsupported.length ? `${plan.equipmentFit.percent}% compatibile con i tuoi attrezzi` : "Compatibile con i tuoi attrezzi"}</p>}</div>{active && <span className="shrink-0 rounded-full bg-[var(--accent)] px-3 py-1.5 text-[9px] font-black text-[var(--accent-foreground)]">ATTIVO</span>}</div><div className="mt-6 divide-y divide-[var(--border)] border-y border-[var(--border)]">{plan.templates.map(template => <div key={template.id} className="flex min-h-16 items-center justify-between gap-4 py-3.5"><div className="min-w-0"><p className="text-[9px] font-black uppercase tracking-[0.18em] text-[var(--muted)]">Giorno {template.dayNumber}</p><p className="mt-1 truncate text-sm font-black sm:text-base">{template.name}</p></div><div className="flex shrink-0 items-center gap-2 text-[10px] font-bold text-[var(--muted)]"><span>{template._count.exercises} esercizi</span>{template.estimatedMins ? <span>· {template.estimatedMins} min</span> : null}<ChevronRight size={14} /></div></div>)}</div>{!active && <button type="button" onClick={() => choose(plan.id)} disabled={saving !== null} className="mt-5 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-5 py-3.5 text-sm font-black text-[var(--accent-foreground)] transition active:scale-[.985] disabled:cursor-wait disabled:opacity-60">{saving === plan.id ? "AGGIORNAMENTO..." : isRecommended ? "SCEGLI PROGRAMMA CONSIGLIATO" : "SCEGLI PROGRAMMA"}</button>}</div></article>; })}</div></section>
 
         {!loading && plans.length === 0 && !activePlan && <div className="mt-8 border-y border-[var(--border)] py-6 text-sm leading-6 text-[var(--muted)]">Non ci sono ancora programmi disponibili. Completa il profilo per generare il tuo programma personalizzato.</div>}
         {loading && <div className="mt-8 animate-pulse space-y-2"><div className="h-28 border-y border-[var(--border)] bg-[var(--surface)]/30" /><div className="h-28 border-y border-[var(--border)] bg-[var(--surface)]/30" /></div>}

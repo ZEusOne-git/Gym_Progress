@@ -112,7 +112,7 @@ export async function POST(request: Request) {
           include: {
             exercises: {
               orderBy: { orderIndex: "asc" },
-              include: { exercise: { select: { id: true, category: true, primaryMuscles: true, equipment: true, difficulty: true } } },
+              include: { exercise: { select: { id: true, name: true, category: true, primaryMuscles: true, equipment: true, difficulty: true, isActive: true } } },
             },
           },
         },
@@ -128,8 +128,13 @@ export async function POST(request: Request) {
   const available = parseEquipment(onboarding?.equipmentJson);
   const adaptations: { from: string; to: string }[] = [];
   const resolvedExercises = new Map<string, string>();
+  const incompatible: string[] = [];
   for (const template of source.templates) {
     for (const item of template.exercises) {
+      if (!item.exercise.isActive) {
+        incompatible.push(item.exercise.name);
+        continue;
+      }
       const requirements = parseEquipment(item.exercise.equipment);
       if (isEquipmentCompatible(requirements, available)) {
         resolvedExercises.set(item.id, item.exercise.id);
@@ -140,9 +145,12 @@ export async function POST(request: Request) {
         resolvedExercises.set(item.id, alternative.id);
         adaptations.push({ from: item.exercise.id, to: alternative.id });
       } else {
-        resolvedExercises.set(item.id, item.exercise.id);
+        incompatible.push(item.exercise.name);
       }
     }
+  }
+  if (incompatible.length) {
+    return NextResponse.json({ error: `Non è possibile assegnare questo programma con l'attrezzatura disponibile. Esercizi da correggere: ${[...new Set(incompatible)].join(", ")}.` }, { status: 409 });
   }
 
   const count = Math.max(1, Math.min(source.templates.length, 7));

@@ -1,8 +1,8 @@
-import type { ExerciseCandidate, MusclePriority, PlanPreferences } from "./types";
+import type { ExerciseCandidate, PlanPreferences } from "./types";
 
 const normalize = (value: string) => value.trim().toLowerCase().replace(/[\s_-]+/g, " ");
 const BODYWEIGHT = new Set(["bodyweight", "body weight", "no equipment", "none"]);
-const muscleAliases: Record<string, MusclePriority> = {
+const muscleAliases: Record<string, string> = {
   biceps: "ARMS",
   triceps: "ARMS",
   arms: "ARMS",
@@ -11,24 +11,26 @@ const muscleAliases: Record<string, MusclePriority> = {
   core: "CORE",
 };
 
-const normalizedMuscle = (value: string): MusclePriority | string => muscleAliases[normalize(value)] ?? value.trim().toUpperCase().replace(/[\s-]+/g, "_");
+const normalizedMuscle = (value: string) => muscleAliases[normalize(value)] ?? value.trim().toUpperCase().replace(/[\s-]+/g, "_");
 
 function equipmentMatches(candidate: ExerciseCandidate, available: string[]) {
   const wanted = new Set(available.map(normalize));
   const candidateEquipment = candidate.equipment.map(normalize);
 
-  if (!wanted.size) {
-    return candidateEquipment.length === 0 || candidateEquipment.some((item) => BODYWEIGHT.has(item));
-  }
+  // Bodyweight movements are a universal fallback: an athlete who owns any
+  // gym equipment can still perform them, and they are essential when the
+  // selected profile is home/minimal equipment.
+  if (candidateEquipment.some((item) => BODYWEIGHT.has(item))) return true;
 
+  if (!wanted.size) return candidateEquipment.length === 0;
   if (candidateEquipment.length === 0) return true;
 
   return candidateEquipment.some((value) => {
-    if (BODYWEIGHT.has(value) && (wanted.has("bodyweight") || wanted.has("body weight"))) return true;
     if (wanted.has(value)) return true;
-    if (wanted.has("free weights") && ["dumbbells", "dumbbell", "kettlebell", "bodyweight"].includes(value)) return true;
+    if (wanted.has("free weights") && ["dumbbells", "dumbbell", "kettlebell"].includes(value)) return true;
     if (wanted.has("barbells") && ["barbell", "ez bar", "ez curl bar", "trap bar"].includes(value)) return true;
     if (wanted.has("machines") && ["machine", "cable", "cables", "smith machine"].includes(value)) return true;
+    if (wanted.has("cardio") && ["treadmill", "bike", "stationary bike", "rowing machine", "elliptical"].includes(value)) return true;
     return false;
   });
 }

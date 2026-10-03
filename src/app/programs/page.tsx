@@ -20,11 +20,13 @@ type Plan = {
     unsupported: string[];
     percent: number;
   };
+  trainingDaysFit?: boolean;
 };
 
 export default function ProgramsPage() {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [current, setCurrent] = useState<{ id: string; name: string } | null>(null);
+  const [preferredTrainingDays, setPreferredTrainingDays] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
   const [message, setMessage] = useState("");
@@ -37,6 +39,7 @@ export default function ProgramsPage() {
         if (!r.ok) throw new Error(d.error || "Impossibile caricare i programmi.");
         setPlans(d.plans || []);
         setCurrent(d.current || null);
+        setPreferredTrainingDays(typeof d.preferredTrainingDays === "number" ? d.preferredTrainingDays : null);
       })
       .catch(e => setError(e instanceof Error ? e.message : "Errore"))
       .finally(() => setLoading(false));
@@ -85,6 +88,7 @@ export default function ProgramsPage() {
           <p className="mt-3 max-w-2xl text-sm leading-6 text-[var(--muted)]">
             Ogni programma prepara automaticamente le tue sessioni. Tu devi solo aprire l&apos;allenamento e seguirlo.
           </p>
+          {preferredTrainingDays !== null && <p className="mt-3 max-w-2xl text-xs leading-5 text-[var(--muted)]">Nel profilo hai indicato {preferredTrainingDays} {preferredTrainingDays === 1 ? "giorno" : "giorni"} di allenamento a settimana. Controlla la frequenza di ogni programma prima di sceglierlo.</p>}
         </header>
 
         {activePlan && (
@@ -135,6 +139,7 @@ export default function ProgramsPage() {
                       <p className="mt-2 text-sm text-[var(--muted)]">
                         {plan.templates.length} giorni di allenamento · {totalExercises} esercizi
                       </p>
+                      {preferredTrainingDays !== null && !plan.trainingDaysFit && <p className="mt-2 text-xs font-bold text-amber-300">Questo programma prevede {plan.templates.length} giorni a settimana, diversi dalla tua preferenza di {preferredTrainingDays}.</p>}
                       {plan.equipmentFit ? (
                         <div className="mt-3 flex flex-wrap items-center gap-2 text-[10px] font-black uppercase tracking-[0.14em]">
                           <span className={plan.equipmentFit.unsupported.length ? "text-amber-300" : "text-[var(--accent)]"}>

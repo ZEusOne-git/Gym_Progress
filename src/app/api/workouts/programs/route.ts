@@ -58,7 +58,7 @@ export async function GET() {
     prisma.onboardingResponse.findUnique({ where: { userId: user.id }, select: { equipmentJson: true } }),
     prisma.profile.findUnique({ where: { userId: user.id }, select: { trainingDays: true } }),
     prisma.workoutPlan.findMany({
-      where: { isTemplate: true, isActive: true },
+      where: { isTemplate: true, isActive: true, OR: [{ userId: null }, { userId: user.id }] },
       orderBy: { updatedAt: "desc" },
       select: {
         id: true,
@@ -106,7 +106,7 @@ export async function POST(request: Request) {
   const [onboarding, source, catalog] = await Promise.all([
     prisma.onboardingResponse.findUnique({ where: { userId: user.id }, select: { equipmentJson: true } }),
     prisma.workoutPlan.findFirst({
-      where: { id: templatePlanId, isTemplate: true, isActive: true },
+      where: { id: templatePlanId, isTemplate: true, isActive: true, OR: [{ userId: null }, { userId: user.id }] },
       include: {
         templates: {
           orderBy: { dayNumber: "asc" },

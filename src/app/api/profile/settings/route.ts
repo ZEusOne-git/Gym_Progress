@@ -47,7 +47,7 @@ export async function PUT(request: Request) {
     },
     create: {
       userId: user.id,
-      environment: "COMMERCIAL_GYM",
+      environment: equipment.length === ALLOWED_EQUIPMENT.length ? "COMMERCIAL_GYM" : "CUSTOM",
       equipmentJson: JSON.stringify(equipment),
       completedAt: new Date(),
     },

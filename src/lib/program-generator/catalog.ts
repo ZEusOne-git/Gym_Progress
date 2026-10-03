@@ -33,12 +33,15 @@ function equipmentMatches(candidate: ExerciseCandidate, available: string[]) {
   });
 }
 
-/** Scores an exercise without making media a hard requirement. */
+/** Scores an exercise without making media a hard requirement. Video is preferred when available. */
 export function scoreExercise(exercise: ExerciseCandidate, preferences: PlanPreferences, focus: string[]): number {
   if (!equipmentMatches(exercise, preferences.equipment)) return Number.NEGATIVE_INFINITY;
 
-  let score = exercise.hasStaticMedia ? 2 : 0;
-  if (exercise.hasVideoMedia) score += 2;
+  // Media improves the workout experience, but never excludes an otherwise
+  // suitable exercise. A video is preferred over a static illustration; a
+  // static illustration is still preferred over an exercise with no media.
+  let score = exercise.hasStaticMedia ? 1 : 0;
+  if (exercise.hasVideoMedia) score += 3;
   const groups = new Set(exercise.muscleGroups.map(normalizedMuscle));
   for (const priority of preferences.priorities ?? []) {
     if (groups.has(priority)) score += 5;

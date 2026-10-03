@@ -28,9 +28,11 @@ function coverageScore(candidate: ExerciseCandidate, focus: MusclePriority[], pr
     if (priorities.has(group)) score += 6;
     score -= (counts.get(group) ?? 0) * 3;
   }
-  if (candidate.hasStaticMedia) score += 2;
-  if (candidate.hasVideoMedia) score += 1;
-  score -= (usedThisWeek.get(candidate.id) ?? 0) * 12;
+  // Free media is preferred when available, but media never makes an exercise mandatory.
+  if (candidate.hasVideoMedia) score += 4;
+  else if (candidate.hasStaticMedia) score += 1;
+  // Avoid turning a six-day plan into the same small list of exercises.
+  score -= (usedThisWeek.get(candidate.id) ?? 0) * 16;
   return score;
 }
 
@@ -48,10 +50,17 @@ function exercisesForSession(preferences: PlanPreferences) {
 }
 
 function pickBest(pool: ExerciseCandidate[], selected: ExerciseCandidate[], focus: MusclePriority[], priorities: Set<MusclePriority>, counts: Map<MusclePriority, number>, usedThisWeek: Map<string, number>, muscle?: MusclePriority) {
-  return pool
+  const candidates = pool
     .filter((candidate) => !selected.some((item) => item.id === candidate.id))
-    .filter((candidate) => !muscle || normalizedMuscles(candidate.muscleGroups).includes(muscle))
-    .sort((a, b) => coverageScore(b, focus, priorities, counts, usedThisWeek) - coverageScore(a, focus, priorities, counts, usedThisWeek) || (usedThisWeek.get(a.id) ?? 0) - (usedThisWeek.get(b.id) ?? 0) || a.id.localeCompare(b.id))[0];
+    .filter((candidate) => !muscle || normalizedMuscles(candidate.muscleGroups).includes(muscle));
+
+  // Prefer exercises that have not appeared yet this week. If the catalog is too small,
+  // allow a second appearance rather than producing an incomplete workout.
+  const fresh = candidates.filter((candidate) => (usedThisWeek.get(candidate.id) ?? 0) === 0);
+  const reusable = candidates.filter((candidate) => (usedThisWeek.get(candidate.id) ?? 0) < 2);
+  const source = fresh.length ? fresh : reusable.length ? reusable : candidates;
+
+  return source.sort((a, b) => coverageScore(b, focus, priorities, counts, usedThisWeek) - coverageScore(a, focus, priorities, counts, usedThisWeek) || (usedThisWeek.get(a.id) ?? 0) - (usedThisWeek.get(b.id) ?? 0) || a.id.localeCompare(b.id))[0];
 }
 
 export function generatePlan(preferences: PlanPreferences, candidates: ExerciseCandidate[]): { name: string; days: GeneratedDay[] } {
@@ -63,23 +72,27 @@ export function generatePlan(preferences: PlanPreferences, candidates: ExerciseC
 
   const days = split.map((splitDay) => {
     const focus = [...splitDay.focus].sort((a, b) => Number(priorities.has(b)) - Number(priorities.has(a)));
-    const pool = selectExercises(candidates, preferences, focus, Math.max(candidates.length, exercisesPerDay * 4));
+    const pool = selectExercises(candidates, preferences, focus, Math.max(candidates.length, exercisesPerDay * 6));
     const selected: ExerciseCandidate[] = [];
     const counts = new Map<MusclePriority, number>();
 
+    // First guarantee the user's selected priorities are represented whenever the
+    // catalog contains a compatible exercise for that muscle.
     for (const priority of priorities) {
       if (!focus.includes(priority) || selected.length >= exercisesPerDay) continue;
       const match = pickBest(pool, selected, focus, priorities, counts, usedThisWeek, priority);
       if (match) addCandidate(match, selected, counts);
     }
+
+    // Then fill the session according to the split, balancing muscle coverage and media.
     for (const muscle of focus) {
       if (selected.length >= exercisesPerDay) break;
       const match = pickBest(pool, selected, focus, priorities, counts, usedThisWeek, muscle);
       if (match) addCandidate(match, selected, counts);
     }
+
     while (selected.length < exercisesPerDay) {
-      const unused = pool.filter((candidate) => (usedThisWeek.get(candidate.id) ?? 0) === 0);
-      const next = pickBest(unused.length ? unused : pool, selected, focus, priorities, counts, usedThisWeek);
+      const next = pickBest(pool, selected, focus, priorities, counts, usedThisWeek);
       if (!next) break;
       addCandidate(next, selected, counts);
     }
@@ -93,5 +106,6 @@ export function generatePlan(preferences: PlanPreferences, candidates: ExerciseC
     });
     return { ...splitDay, exercises };
   });
+
   return { name: `${goalNames[preferences.goal]} · ${preferences.trainingDays} giorni`, days };
 }

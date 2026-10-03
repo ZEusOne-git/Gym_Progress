@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Check, ChevronRight, Dumbbell, Sparkles } from "lucide-react";
+import { ArrowLeft, ArrowRight, CalendarDays, Check, ChevronRight, Dumbbell, Sparkles } from "lucide-react";
 
 type Exercise = { exercise: { id: string; name: string; equipment: string }; sets: number; repMin: number | null; repMax: number | null };
 type Plan = {
@@ -53,6 +53,7 @@ export default function ProgramsPage() {
 
   const activeTemplate = useMemo(() => plans.find(p => p.id === current?.id || p.name === current?.name) ?? null, [plans, current]);
   const activePlan = currentPlan ?? activeTemplate;
+  const activeExerciseCount = activePlan?.templates.reduce((total, template) => total + template._count.exercises, 0) ?? 0;
 
   return (
     <main className="min-h-[100dvh] bg-[var(--background)] pb-28">
@@ -66,7 +67,7 @@ export default function ProgramsPage() {
         </header>
 
         {activePlan && (
-          <section className="mt-8 border-y border-[var(--accent)]/25 py-5 sm:py-7">
+          <section className="mt-8 overflow-hidden border-y border-[var(--accent)]/25 py-5 sm:py-7">
             <div className="flex items-start gap-3">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[var(--accent)] text-[var(--accent-foreground)]"><Check size={18} strokeWidth={3} /></div>
               <div className="min-w-0 flex-1">
@@ -75,9 +76,16 @@ export default function ProgramsPage() {
                   {currentPlan && <span className="rounded-full border border-[var(--accent)]/30 px-2 py-1 text-[8px] font-black uppercase tracking-[0.14em] text-[var(--accent)]">Personalizzato</span>}
                 </div>
                 <p className="mt-1 truncate text-xl font-black">{activePlan.name}</p>
-                <p className="mt-1 text-sm text-[var(--muted)]">{activePlan.templates.length} giorni · {activePlan.templates.reduce((total, t) => total + t._count.exercises, 0)} esercizi programmati</p>
+                <p className="mt-1 text-sm text-[var(--muted)]">{activePlan.templates.length} giorni · {activeExerciseCount} esercizi · calendario generato per 12 settimane</p>
               </div>
             </div>
+
+            {currentPlan && <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-3">
+              <Link href="/calendar" className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-4 py-3 text-xs font-black text-[var(--accent-foreground)]"><CalendarDays size={16} /> VEDI CALENDARIO</Link>
+              <Link href="/workout/active" className="flex min-h-12 items-center justify-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-xs font-black"><Dumbbell size={16} /> ALLENATI</Link>
+              <Link href="/onboarding?edit=1" className="col-span-2 flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[var(--border)] px-4 py-3 text-xs font-bold text-[var(--muted)] sm:col-span-1">MODIFICA PROFILO <ArrowRight size={14} /></Link>
+            </div>}
+
             <div className="mt-5 divide-y divide-[var(--border)] border-y border-[var(--border)]">
               {activePlan.templates.map(template => (
                 <div key={template.id} className="py-4">

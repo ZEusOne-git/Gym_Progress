@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, ArrowRight, CalendarDays, Check, ChevronRight, Dumbbell, ExternalLink, Image as ImageIcon, Play, Sparkles } from "lucide-react";
+import { ArrowLeft, ArrowRight, CalendarDays, Check, ChevronRight, Dumbbell, Play, Sparkles } from "lucide-react";
 
 type ExerciseMedia = { type: "VIDEO" | "WEBM" | "GIF" | "IMAGE"; url: string; thumbnailUrl: string | null; sourceName: string | null; sourceUrl: string | null; attribution: string | null };
 type Exercise = { exercise: { id: string; name: string; slug?: string; equipment: string; media?: ExerciseMedia[] }; sets: number; repMin: number | null; repMax: number | null };
@@ -18,12 +18,12 @@ type GeneratedPlan = Plan & { isTemplate: false };
 
 function MediaPreview({ media }: { media?: ExerciseMedia[] }) {
   const primary = media?.[0];
-  if (!primary) return <span className="inline-flex items-center gap-1 rounded-full border border-[var(--border)] px-2 py-1 text-[8px] font-black uppercase tracking-[0.12em] text-[var(--muted)]">Scheda senza video</span>;
+  if (!primary) return <span className="inline-flex items-center gap-1 rounded-full border border-[var(--border)] px-2 py-1 text-[8px] font-black uppercase tracking-[0.12em] text-[var(--muted)]">Media non disponibile</span>;
   const isPlayable = ["VIDEO", "WEBM", "GIF"].includes(primary.type);
   return (
     <a href={primary.url} target="_blank" rel="noreferrer" className="group relative block h-14 w-20 shrink-0 overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)]">
       {primary.thumbnailUrl || primary.type === "IMAGE" ? <img src={primary.thumbnailUrl || primary.url} alt="" className="h-full w-full object-cover transition group-hover:scale-105" /> : <div className="flex h-full items-center justify-center"><Play size={18} /></div>}
-      <span className="absolute inset-x-0 bottom-0 bg-black/65 px-1.5 py-1 text-[7px] font-black uppercase tracking-[0.08em] text-white">{isPlayable ? "Video" : "Immagine"}</span>
+      <span className="absolute inset-x-0 bottom-0 bg-black/65 px-1.5 py-1 text-[7px] font-black uppercase tracking-[0.08em] text-white">{isPlayable ? "Video" : "Illustrazione"}</span>
     </a>
   );
 }
@@ -58,7 +58,8 @@ export default function ProgramsPage() {
       const r = await fetch("/api/workouts/programs", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ templatePlanId: id }) });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || "Impossibile aggiornare il programma.");
-      setMessage(d.adapted?.count ? `Programma aggiornato. ${d.adapted.count} esercizi sono stati adattati all'attrezzatura disponibile.` : "Programma aggiornato. Il nuovo calendario è pronto.");
+      const adaptedCount = Array.isArray(d.adaptations) ? d.adaptations.length : 0;
+      setMessage(adaptedCount ? `Programma aggiornato. ${adaptedCount} esercizi sono stati adattati all'attrezzatura disponibile.` : "Programma aggiornato. Il nuovo calendario è pronto.");
       await loadPrograms();
     } catch (e) { setError(e instanceof Error ? e.message : "Errore"); }
     finally { setSaving(null); }
@@ -93,7 +94,7 @@ export default function ProgramsPage() {
             <div className="mt-5 divide-y divide-[var(--border)] border-y border-[var(--border)]">
               {activePlan.templates.map(template => <div key={template.id} className="py-4"><div className="flex min-h-12 items-center justify-between gap-4"><div className="min-w-0"><p className="text-[9px] font-black uppercase tracking-[0.18em] text-[var(--muted)]">Giorno {template.dayNumber}</p><p className="mt-1 truncate text-sm font-black sm:text-base">{template.name}</p></div><div className="flex shrink-0 items-center gap-2 text-[10px] font-bold text-[var(--muted)]"><span>{template._count.exercises} esercizi</span>{template.estimatedMins ? <span>· {template.estimatedMins} min</span> : null}</div></div>{template.exercises?.length ? <div className="mt-3 grid gap-2 sm:grid-cols-2">{template.exercises.map((item, index) => <div key={`${template.id}-${item.exercise.id}-${index}`} className="flex min-w-0 items-center gap-3 rounded-xl bg-[var(--surface)]/40 px-3 py-2.5"><span className="w-5 shrink-0 text-center text-[9px] font-black text-[var(--muted)]">{index + 1}</span><div className="min-w-0 flex-1"><p className="truncate text-xs font-black">{item.exercise.name}</p><p className="mt-0.5 text-[9px] font-bold text-[var(--muted)]">{item.sets} serie{item.repMin ? ` · ${item.repMin}${item.repMax ? `–${item.repMax}` : ""} rip` : ""}</p></div><MediaPreview media={item.exercise.media} /></div>)}</div> : null}</div>)}
             </div>
-            {currentPlan && <p className="mt-4 text-xs leading-5 text-[var(--muted)]">Gli esercizi vengono mostrati con il media gratuito disponibile; quando non c'è un video resta disponibile la scheda esercizio.</p>}
+            {currentPlan && <p className="mt-4 text-xs leading-5 text-[var(--muted)]">Le dimostrazioni disponibili provengono dal catalogo gratuito RepDB; il piano gratuito usa illustrazioni statiche WebP. Le animazioni appartengono al catalogo a pagamento.</p>}
           </section>
         )}
 

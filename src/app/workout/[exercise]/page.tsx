@@ -46,6 +46,8 @@ export default async function ExercisePage({ params }: PageProps) {
         cues: JSON.parse(exercise.cuesJson),
         mediaUrl: exercise.media[0]?.url ?? null,
         mediaType: exercise.media[0]?.type ?? null,
+        attribution: exercise.media[0]?.attribution ?? null,
+        sourceUrl: exercise.media[0]?.sourceUrl ?? null,
       }}
     />
   );

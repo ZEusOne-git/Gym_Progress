@@ -1,0 +1,40 @@
+export type ExerciseHowTo = {
+  setup: string;
+  execution: string;
+  breathing: string;
+  cue: string;
+};
+
+const HOW_TO: Record<string, ExerciseHowTo> = {
+  "ab-wheel-rollout": { setup: "Inginocchiati, impugna la ruota sotto le spalle e contrai l'addome.", execution: "Fai rotolare la ruota in avanti mantenendo bacino e schiena controllati, poi torna senza inarcare la zona lombare.", breathing: "Inspira mentre ti allontani; espira mentre ritorni.", cue: "Mantieni addome attivo e movimento lento." },
+  "barbell-reverse-lunge": { setup: "Posiziona il bilanciere sulle spalle e parti in piedi con i piedi alla larghezza del bacino.", execution: "Porta una gamba indietro, scendi controllando il ginocchio e spingi dal piede anteriore per tornare in piedi.", breathing: "Inspira nella discesa; espira nella risalita.", cue: "Ginocchio anteriore stabile e busto controllato." },
+  "bench-leg-pull-in": { setup: "Siediti sul bordo della panca con le mani in appoggio e le gambe distese.", execution: "Richiama le ginocchia verso il busto senza slanciarti, poi estendi nuovamente le gambe con controllo.", breathing: "Espira nella chiusura; inspira nell'estensione.", cue: "Muovi il bacino senza usare lo slancio." },
+  "bent-over-db-row": { setup: "Inclina il busto con schiena neutra e manubri sotto le spalle.", execution: "Tira i manubri verso i fianchi portando indietro i gomiti, poi abbassali lentamente.", breathing: "Espira nella tirata; inspira nella discesa.", cue: "Spalle lontane dalle orecchie e schiena ferma." },
+  "bicep-curl": { setup: "Stai in piedi con i manubri lungo i fianchi e i gomiti vicini al busto.", execution: "Fletti i gomiti portando i manubri verso le spalle senza muovere le braccia, poi scendi lentamente.", breathing: "Espira mentre fletti; inspira mentre scendi.", cue: "Evita di oscillare con il busto." },
+  "cat-cow": { setup: "Mettiti a quattro appoggi con mani sotto le spalle e ginocchia sotto i fianchi.", execution: "Alterna una posizione con schiena estesa e una con schiena arrotondata, muovendoti lentamente.", breathing: "Coordina il respiro con il cambio di posizione.", cue: "Muovi tutta la colonna senza forzare il range." },
+  "decline-db-fly": { setup: "Sdraiati su panca declinata con i manubri sopra il petto e gomiti leggermente piegati.", execution: "Apri le braccia lateralmente con controllo e richiudile sopra il petto senza perdere la posizione delle spalle.", breathing: "Inspira in apertura; espira nella chiusura.", cue: "Non trasformare il movimento in una distensione." },
+  "ez-bar-upright-row": { setup: "Impugna la barra EZ davanti alle cosce con presa comoda e busto stabile.", execution: "Solleva i gomiti guidando la barra verso il tronco alto, poi abbassala lentamente.", breathing: "Espira nella salita; inspira nella discesa.", cue: "Usa un range confortevole per le spalle." },
+  "front-squat": { setup: "Tieni il bilanciere davanti alle spalle, gomiti alti e piedi stabili.", execution: "Scendi piegando anche e ginocchia mantenendo il busto controllato, poi spingi il pavimento per risalire.", breathing: "Inspira e crea tensione prima della discesa; espira nella risalita.", cue: "Mantieni i gomiti alti e il peso distribuito sul piede." },
+  "incline-db-curl": { setup: "Siediti su panca inclinata con braccia rilassate verso il basso e manubri in mano.", execution: "Fletti i gomiti senza portarli avanti, poi estendi le braccia lentamente.", breathing: "Espira nella flessione; inspira nell'estensione.", cue: "Controlla soprattutto la fase di discesa." },
+  "kneeling-cable-row": { setup: "Inginocchiati davanti al cavo con busto stabile e presa salda.", execution: "Tira la maniglia verso il busto avvicinando le scapole, poi lascia tornare le braccia con controllo.", breathing: "Espira nella tirata; inspira nel ritorno.", cue: "Non compensare con il movimento del tronco." },
+  "machine-chest-fly": { setup: "Regola il sedile e appoggia schiena e testa allo schienale.", execution: "Chiudi le braccia davanti al petto senza perdere la posizione delle spalle, poi ritorna lentamente.", breathing: "Espira nella chiusura; inspira nell'apertura.", cue: "Mantieni una leggera flessione dei gomiti." },
+  "mountain-climbers": { setup: "Parti in posizione plank con mani sotto le spalle e corpo allineato.", execution: "Porta alternativamente le ginocchia verso il petto mantenendo il tronco stabile.", breathing: "Respira in modo regolare durante il ritmo.", cue: "Evita di far oscillare il bacino." },
+  "one-arm-kettlebell-row": { setup: "Appoggia una mano per stabilizzarti e mantieni schiena neutra con kettlebell nell'altra mano.", execution: "Tira il kettlebell verso il fianco portando indietro il gomito, poi abbassalo controllando il peso.", breathing: "Espira nella tirata; inspira nella discesa.", cue: "Mantieni spalle e bacino orientati e stabili." },
+  "pull-up": { setup: "Afferra la sbarra con presa stabile e parti con il corpo in controllo.", execution: "Tira il corpo verso la sbarra guidando con i gomiti, poi scendi lentamente fino a distendere le braccia in modo controllato.", breathing: "Espira nella tirata; inspira nella discesa.", cue: "Evita lo slancio e mantieni il tronco compatto." },
+  "reverse-grip-lat-pulldown": { setup: "Siediti alla lat machine e impugna la barra con presa supina leggermente più stretta delle spalle.", execution: "Porta la barra verso la parte alta del petto tirando i gomiti verso il basso, poi risali controllando.", breathing: "Espira nella tirata; inspira nel ritorno.", cue: "Non tirare la barra dietro la nuca." },
+  "rowing-machine": { setup: "Regola i piedi e siediti con schiena neutra, impugnando la maniglia.", execution: "Spingi con le gambe, accompagna con il busto e termina tirando la maniglia verso il tronco; ritorna invertendo il movimento.", breathing: "Espira nella tirata; inspira nel ritorno.", cue: "Sequenza: gambe, busto, braccia; poi ritorno controllato." },
+  "running": { setup: "Parti con postura alta, sguardo avanti e appoggio naturale del piede.", execution: "Corri con passo regolare, braccia rilassate e ritmo sostenibile per la durata prevista.", breathing: "Respira in modo regolare e naturale.", cue: "Aumenta il ritmo gradualmente, senza partire troppo forte." },
+  "side-lying-lateral-raise": { setup: "Sdraiati su un fianco e stabilizza il corpo, tenendo il manubrio con la mano superiore.", execution: "Solleva il braccio lateralmente con controllo fino a un range confortevole, poi abbassalo lentamente.", breathing: "Espira nella salita; inspira nella discesa.", cue: "Evita di ruotare il busto per aiutarti." },
+  "single-arm-tricep-pushdown": { setup: "Posizionati al cavo con gomito vicino al fianco e presa salda.", execution: "Estendi il gomito verso il basso senza spostare la parte superiore del braccio, poi ritorna lentamente.", breathing: "Espira nell'estensione; inspira nel ritorno.", cue: "Il movimento parte dal gomito, non dalla spalla." },
+  "smith-machine-front-squat": { setup: "Posizionati alla Smith con il bilanciere davanti alle spalle e piedi stabili.", execution: "Scendi controllando anche e ginocchia, poi spingi il pavimento per tornare in piedi mantenendo il busto alto.", breathing: "Inspira prima e durante la discesa; espira nella risalita.", cue: "Mantieni il percorso stabile e il core attivo." },
+  "thruster": { setup: "Tieni i pesi sulle spalle e parti in piedi con piedi stabili.", execution: "Esegui uno squat controllato e usa la risalita per spingere i pesi sopra la testa, poi riportali alle spalle.", breathing: "Inspira nella discesa; espira durante la spinta.", cue: "Collega squat e spinta senza perdere il controllo." },
+};
+
+export function getExerciseHowTo(slug: string): ExerciseHowTo {
+  return HOW_TO[slug] ?? {
+    setup: "Assumi una posizione stabile e prepara il movimento senza slanci.",
+    execution: "Esegui ogni ripetizione con un ritmo controllato e torna alla posizione iniziale senza perdere l'assetto.",
+    breathing: "Respira in modo regolare, espirando nella fase di maggiore sforzo.",
+    cue: "Priorità a controllo, postura e movimento senza dolore.",
+  };
+}

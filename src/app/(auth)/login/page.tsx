@@ -5,6 +5,17 @@ import { ArrowLeft, Eye, EyeOff, Loader2, LockKeyhole, Mail } from "lucide-react
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
 
+function getSafeDestination(next: string | null) {
+  if (!next?.startsWith("/") || next.startsWith("//")) return "/onboarding";
+  try {
+    const destination = new URL(next, window.location.origin);
+    if (destination.origin !== window.location.origin) return "/onboarding";
+    return `${destination.pathname}${destination.search}${destination.hash}`;
+  } catch {
+    return "/onboarding";
+  }
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
@@ -34,8 +45,7 @@ export default function LoginPage() {
         return;
       }
       const next = new URLSearchParams(window.location.search).get("next");
-      const destination = next?.startsWith("/") && !next.startsWith("//") ? next : "/onboarding";
-      router.push(destination);
+      router.push(getSafeDestination(next));
       router.refresh();
     } catch {
       setError("Impossibile raggiungere il server. Controlla che npm run dev sia attivo.");

@@ -27,17 +27,25 @@ const aliases: Record<string, MusclePriority> = {
 
 const normalizedMuscles = (groups: MusclePriority[]) => groups.map((group) => aliases[group] ?? group);
 
-function coverageScore(candidate: ExerciseCandidate, focus: MusclePriority[], priorities: Set<MusclePriority>, counts: Map<MusclePriority, number>) {
+function coverageScore(candidate: ExerciseCandidate, focus: MusclePriority[], priorities: Set<MusclePriority>, counts: Map<MusclePriority, number>, usedThisWeek: Map<string, number>) {
   const groups = normalizedMuscles(candidate.muscleGroups);
   let score = 0;
   for (const group of groups) {
     if (focus.includes(group)) score += 8;
     if (priorities.has(group)) score += 6;
-    score -= (counts.get(group) ?? 0) * 2;
+    score -= (counts.get(group) ?? 0) * 3;
   }
-  if (candidate.hasStaticMedia) score += 1;
+  if (candidate.hasStaticMedia) score += 2;
   if (candidate.hasVideoMedia) score += 1;
+  score -= (usedThisWeek.get(candidate.id) ?? 0) * 8;
   return score;
+}
+
+function addCandidate(candidate: ExerciseCandidate, selected: ExerciseCandidate[], counts: Map<MusclePriority, number>) {
+  selected.push(candidate);
+  for (const group of normalizedMuscles(candidate.muscleGroups)) {
+    counts.set(group, (counts.get(group) ?? 0) + 1);
+  }
 }
 
 export function generatePlan(preferences: PlanPreferences, candidates: ExerciseCandidate[]): { name: string; days: GeneratedDay[] } {
@@ -49,36 +57,36 @@ export function generatePlan(preferences: PlanPreferences, candidates: ExerciseC
 
   const days = split.map((splitDay) => {
     const focus = [...splitDay.focus].sort((a, b) => Number(priorities.has(b)) - Number(priorities.has(a)));
-    const pool = selectExercises(candidates, preferences, focus, Math.min(candidates.length, 18));
+    const pool = selectExercises(candidates, preferences, focus, candidates.length);
     const selected: ExerciseCandidate[] = [];
     const counts = new Map<MusclePriority, number>();
 
+    // First guarantee the user's explicit priorities when compatible exercises exist.
+    for (const priority of priorities) {
+      if (!focus.includes(priority) || selected.length >= exercisesPerDay) continue;
+      const match = pool
+        .filter((candidate) => !selected.some((item) => item.id === candidate.id))
+        .filter((candidate) => normalizedMuscles(candidate.muscleGroups).includes(priority))
+        .sort((a, b) => coverageScore(b, focus, priorities, counts, usedThisWeek) - coverageScore(a, focus, priorities, counts, usedThisWeek))[0];
+      if (match) addCandidate(match, selected, counts);
+    }
+
+    // Then cover the day's split focus, preferring less-used exercises and balanced muscle coverage.
     for (const muscle of focus) {
+      if (selected.length >= exercisesPerDay) break;
       const match = pool
         .filter((candidate) => !selected.some((item) => item.id === candidate.id))
         .filter((candidate) => normalizedMuscles(candidate.muscleGroups).includes(muscle))
-        .sort((a, b) => {
-          const aReuse = usedThisWeek.get(a.id) ?? 0;
-          const bReuse = usedThisWeek.get(b.id) ?? 0;
-          return coverageScore(b, focus, priorities, counts) - coverageScore(a, focus, priorities, counts) || aReuse - bReuse;
-        })[0];
-      if (match) {
-        selected.push(match);
-        for (const group of normalizedMuscles(match.muscleGroups)) counts.set(group, (counts.get(group) ?? 0) + 1);
-      }
+        .sort((a, b) => coverageScore(b, focus, priorities, counts, usedThisWeek) - coverageScore(a, focus, priorities, counts, usedThisWeek))[0];
+      if (match) addCandidate(match, selected, counts);
     }
 
     while (selected.length < exercisesPerDay) {
       const next = pool
         .filter((candidate) => !selected.some((item) => item.id === candidate.id))
-        .sort((a, b) => {
-          const aScore = coverageScore(a, focus, priorities, counts) - (usedThisWeek.get(a.id) ?? 0) * 5;
-          const bScore = coverageScore(b, focus, priorities, counts) - (usedThisWeek.get(b.id) ?? 0) * 5;
-          return bScore - aScore;
-        })[0];
+        .sort((a, b) => coverageScore(b, focus, priorities, counts, usedThisWeek) - coverageScore(a, focus, priorities, counts, usedThisWeek))[0];
       if (!next) break;
-      selected.push(next);
-      for (const group of normalizedMuscles(next.muscleGroups)) counts.set(group, (counts.get(group) ?? 0) + 1);
+      addCandidate(next, selected, counts);
     }
 
     const exercises: GeneratedExercise[] = selected.map((candidate, orderIndex) => {

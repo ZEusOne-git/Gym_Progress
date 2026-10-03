@@ -6,7 +6,8 @@ export async function POST(request: Request) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Non autorizzato" }, { status: 401 });
   try {
-    const body = await request.json();
+    const body = await request.json().catch(() => null);
+    if (!body || typeof body !== "object" || Array.isArray(body)) return NextResponse.json({ error: "Richiesta non valida." }, { status: 400 });
     const sessionId = typeof body.sessionId === "string" ? body.sessionId : "";
     const exerciseId = typeof body.exerciseId === "string" ? body.exerciseId : "";
     const setNumber = Number(body.setNumber);
@@ -14,13 +15,13 @@ export async function POST(request: Request) {
     const reps = Number(body.reps);
     const rir = body.rir === "" || body.rir == null ? null : Number(body.rir);
     const completed = body.completed !== false;
-    if (!sessionId || !exerciseId || !Number.isInteger(setNumber) || setNumber < 1 || !Number.isFinite(weight) || weight < 0 || !Number.isInteger(reps) || reps < 0) {
+    if (!sessionId || !exerciseId || !Number.isInteger(setNumber) || setNumber < 1 || !Number.isFinite(weight) || weight < 0 || weight > 1000 || !Number.isInteger(reps) || reps < 0 || reps > 10000 || (rir !== null && (!Number.isFinite(rir) || rir < 0 || rir > 10)) || (body.completed !== undefined && typeof body.completed !== "boolean")) {
       return NextResponse.json({ error: "Inserisci peso e ripetizioni validi." }, { status: 400 });
     }
 
     const session = await prisma.workoutSession.findFirst({
       where: { id: sessionId, userId: user.id, completedAt: null },
-      select: { id: true, workoutPlanId: true },
+      select: { id: true, workoutPlanId: true, schedule: { select: { templateId: true } } },
     });
     if (!session) return NextResponse.json({ error: "Sessione non disponibile." }, { status: 404 });
 
@@ -28,12 +29,13 @@ export async function POST(request: Request) {
     // stores the underlying Exercise id. Accept both and normalize here.
     const exercise = await prisma.workoutExercise.findFirst({
       where: {
-        template: { workoutPlanId: session.workoutPlanId },
+        template: session.schedule ? { id: session.schedule.templateId } : { workoutPlanId: session.workoutPlanId },
         OR: [{ id: exerciseId }, { exerciseId }],
       },
-      select: { exerciseId: true },
+      select: { exerciseId: true, sets: true },
     });
     if (!exercise) return NextResponse.json({ error: "Esercizio non presente nella sessione." }, { status: 400 });
+    if (setNumber > exercise.sets) return NextResponse.json({ error: "Questa serie non è prevista nell'allenamento." }, { status: 400 });
 
     const normalizedExerciseId = exercise.exerciseId;
     const existing = await prisma.workoutSet.findFirst({ where: { sessionId, exerciseId: normalizedExerciseId, setNumber } });

@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { FREE_EXERCISE_SET } from "@/lib/program-generator/free-exercise-catalog";
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
@@ -39,8 +38,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   });
   if (!template) return NextResponse.json({ error: "Workout non trovato." }, { status: 404 });
 
-  const exercises = template.exercises.filter(item => FREE_EXERCISE_SET.has(item.exercise.slug));
-  if (!exercises.length) return NextResponse.json({ error: "Questo workout non contiene esercizi disponibili nel catalogo free." }, { status: 409 });
-
-  return NextResponse.json({ template: { ...template, exercises }, plan: template.plan });
+  // I piani nuovi vengono già creati esclusivamente dal catalogo free.
+  // Qui non filtriamo i piani legacy: devono restare allenabili anche quando
+  // contengono esercizi che hanno soltanto la vecchia illustrazione.
+  return NextResponse.json({ template, plan: template.plan });
 }

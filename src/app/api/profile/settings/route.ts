@@ -41,7 +41,10 @@ export async function PUT(request: Request) {
 
   const onboarding = await prisma.onboardingResponse.upsert({
     where: { userId: user.id },
-    update: { equipmentJson: JSON.stringify(equipment) },
+    update: {
+      equipmentJson: JSON.stringify(equipment),
+      environment: equipment.length === ALLOWED_EQUIPMENT.length ? "COMMERCIAL_GYM" : "CUSTOM",
+    },
     create: {
       userId: user.id,
       environment: "COMMERCIAL_GYM",

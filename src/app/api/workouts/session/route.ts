@@ -3,6 +3,8 @@ import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { generateAndAssignPlan } from "@/lib/program-generator/persist";
 
+const PLAN_REGENERATION_FLAG = "planRegenerationPending";
+
 function parseDate(value: unknown) {
   if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
   const [y, m, d] = value.split("-").map(Number);
@@ -11,13 +13,33 @@ function parseDate(value: unknown) {
   return date;
 }
 
-async function refreshPlanAfterSession(userId: string) {
+async function regeneratePendingPlan(userId: string) {
+  const onboarding = await prisma.onboardingResponse.findUnique({ where: { userId }, select: { preferencesJson: true } });
+  let pending = false;
+  try {
+    const preferences = JSON.parse(onboarding?.preferencesJson ?? "{}");
+    pending = Boolean(preferences?.[PLAN_REGENERATION_FLAG]);
+  } catch {
+    pending = false;
+  }
+  if (!pending) return false;
+
   try {
     await generateAndAssignPlan(userId);
+
+    let preferences: Record<string, unknown> = {};
+    try {
+      const parsed = JSON.parse(onboarding?.preferencesJson ?? "{}");
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) preferences = parsed;
+    } catch {
+      // Rebuild only the preferences object if legacy data is malformed.
+    }
+    delete preferences[PLAN_REGENERATION_FLAG];
+    await prisma.onboardingResponse.update({ where: { userId }, data: { preferencesJson: JSON.stringify(preferences) } });
     return true;
   } catch (error) {
-    // Completing an already-finished workout must never fail because the
-    // replacement plan cannot currently be generated.
+    // The workout has already been completed. Keep the pending flag so the
+    // next successful session completion can retry without losing the user's request.
     console.error("[workouts/session] deferred plan regeneration", error);
     return false;
   }
@@ -120,7 +142,7 @@ export async function PATCH(request: Request) {
       const now = new Date();
       const additionalSeconds = Math.max(0, Math.floor((now.getTime() - session.startedAt.getTime()) / 1000));
       const finished = await prisma.workoutSession.update({ where: { id: sessionId }, data: { completedAt: now, endedEarly: true, elapsedSeconds: { increment: additionalSeconds } }, select: { id: true, completedAt: true, endedEarly: true, elapsedSeconds: true } });
-      const planRegenerated = await refreshPlanAfterSession(user.id);
+      const planRegenerated = await regeneratePendingPlan(user.id);
       return NextResponse.json({ ok: true, finishedEarly: true, planRegenerated, session: finished });
     }
     const currentTemplate = session.schedule?.template ?? (() => {
@@ -141,7 +163,7 @@ export async function PATCH(request: Request) {
     const now = new Date();
     const additionalSeconds = Math.max(0, Math.floor((now.getTime() - session.startedAt.getTime()) / 1000));
     const updated = await prisma.workoutSession.update({ where: { id: sessionId }, data: { completedAt: now, endedEarly: false, elapsedSeconds: { increment: additionalSeconds } }, select: { id: true, completedAt: true, elapsedSeconds: true } });
-    const planRegenerated = await refreshPlanAfterSession(user.id);
+    const planRegenerated = await regeneratePendingPlan(user.id);
     return NextResponse.json({ ok: true, planRegenerated, session: updated });
   } catch (error) {
     console.error("[workouts/session PATCH]", error);

@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import ExercisePlayer from "@/components/workout/ExercisePlayer";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { FREE_EXERCISE_SET } from "@/lib/program-generator/free-exercise-catalog";
 
 type PageProps = { params: Promise<{ exercise: string }> };
 
@@ -9,15 +10,17 @@ export default async function ExercisePage({ params }: PageProps) {
   const { exercise: slug } = await params;
   const user = await getCurrentUser();
   if (!user) redirect(`/login?next=/workout/${slug}`);
+  if (!FREE_EXERCISE_SET.has(slug)) notFound();
 
   const [exercise, plan] = await Promise.all([
     prisma.exercise.findFirst({
       where: { slug, isActive: true },
-      include: {
-        media: {
-          where: { isActive: true },
-          orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }],
-        },
+      select: {
+        id: true,
+        name: true,
+        primaryMuscles: true,
+        instructionsJson: true,
+        cuesJson: true,
       },
     }),
     prisma.workoutPlan.findFirst({
@@ -29,6 +32,7 @@ export default async function ExercisePage({ params }: PageProps) {
           select: {
             exercises: {
               orderBy: { orderIndex: "asc" },
+              where: { exercise: { slug: { in: [...FREE_EXERCISE_SET] } } },
               select: {
                 sets: true,
                 repMin: true,
@@ -53,13 +57,10 @@ export default async function ExercisePage({ params }: PageProps) {
     .flatMap(template => template.exercises)
     .find(item => item.exercise.slug === slug);
 
-  const media = exercise.media.map(item => ({
-    url: item.url,
-    type: item.type,
-    attribution: item.attribution,
-    sourceUrl: item.sourceUrl,
-  }));
-  const primaryMedia = media[0] ?? null;
+  let instructions: string[] = [];
+  let cues: string[] = [];
+  try { instructions = JSON.parse(exercise.instructionsJson); } catch { instructions = []; }
+  try { cues = JSON.parse(exercise.cuesJson); } catch { cues = []; }
 
   return (
     <ExercisePlayer
@@ -72,13 +73,11 @@ export default async function ExercisePage({ params }: PageProps) {
         sets: prescription?.sets ?? 3,
         reps: prescription ? `${prescription.repMin}–${prescription.repMax}` : "8–10",
         rest: prescription?.restSeconds ?? 90,
-        instructions: JSON.parse(exercise.instructionsJson),
-        cues: JSON.parse(exercise.cuesJson),
-        mediaUrl: primaryMedia?.url ?? null,
-        mediaType: primaryMedia?.type ?? null,
-        attribution: primaryMedia?.attribution ?? null,
-        sourceUrl: primaryMedia?.sourceUrl ?? null,
-        media,
+        instructions,
+        cues,
+        mediaUrl: `/animations/${slug}.webp`,
+        mediaType: "IMAGE",
+        media: [{ url: `/animations/${slug}.webp`, type: "IMAGE" }],
       }}
     />
   );

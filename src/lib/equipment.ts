@@ -62,9 +62,19 @@ function sharePrimaryMuscles(source: ExerciseEquipment, candidate: ExerciseEquip
 }
 
 export function findAlternativeExercise(source: ExerciseEquipment, catalog: ExerciseEquipment[], available: string[]) {
-  return catalog.find(item =>
-    item.id !== source.id &&
-    sharePrimaryMuscles(source, item) &&
-    isEquipmentCompatible(parseEquipment(item.equipment), available),
-  );
+  const sourceMuscles = new Set(muscleTokens(source.primaryMuscles));
+  for (const token of [...sourceMuscles]) for (const alias of MUSCLE_ALIASES[token] ?? []) sourceMuscles.add(alias);
+
+  return catalog
+    .filter(item => item.id !== source.id && sharePrimaryMuscles(source, item) && isEquipmentCompatible(parseEquipment(item.equipment), available))
+    .map(item => {
+      const candidateMuscles = new Set(muscleTokens(item.primaryMuscles));
+      for (const token of [...candidateMuscles]) for (const alias of MUSCLE_ALIASES[token] ?? []) candidateMuscles.add(alias);
+      const shared = [...candidateMuscles].filter(token => sourceMuscles.has(token)).length;
+      const union = new Set([...sourceMuscles, ...candidateMuscles]).size;
+      const exactMatch = shared === sourceMuscles.size && shared === candidateMuscles.size;
+      const specificCategoryMatch = source.category !== "STRENGTH" && source.category !== "" && source.category === item.category;
+      return { item, score: (exactMatch ? 2 : shared / union) + (specificCategoryMatch ? 0.1 : 0) };
+    })
+    .sort((a, b) => b.score - a.score)[0]?.item;
 }

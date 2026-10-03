@@ -1,13 +1,10 @@
 import { PrismaClient } from "@prisma/client";
+import { FREE_ANIMATION_MEDIA, FREE_EXERCISE_SET, FREE_EXERCISE_SLUGS } from "./free-exercise-catalog.mjs";
 
 const prisma = new PrismaClient();
 const dataUrl = "https://raw.githubusercontent.com/RepDB/exercise-dataset/9ed9357f09c7566ea0256c57ebd6374ebb8b575e/exercises.json";
 const imageBase = "https://exercise-dataset.com/";
-const localSlugAliases = {
-  squat: "barbell-squat",
-  ohp: "shoulder-press",
-  "db-bench-press": "dumbbell-bench-press",
-};
+const localAnimationSource = "Supplied free animation pack";
 
 function list(value) {
   if (Array.isArray(value)) return value.filter(item => typeof item === "string");
@@ -30,11 +27,24 @@ async function main() {
     throw new Error("RepDB returned an unexpected catalog; no records were imported.");
   }
 
+  const sourceBySlug = new Map(dataset.exercises.map(item => [item.id, item]));
+  const missing = FREE_EXERCISE_SLUGS.filter(slug => !sourceBySlug.has(slug));
+  if (missing.length) {
+    throw new Error(`RepDB catalog is missing supplied exercises: ${missing.join(", ")}`);
+  }
+
+  // The supplied ZIP is the source of truth for the active catalog. Existing exercises
+  // outside that list remain in the database for referential integrity, but are hidden
+  // from plan generation and selection.
+  await prisma.exercise.updateMany({
+    where: { slug: { notIn: FREE_EXERCISE_SLUGS } },
+    data: { isActive: false },
+  });
+
   let imported = 0;
   let mediaCount = 0;
-  for (const item of dataset.exercises) {
-    if (typeof item.id !== "string" || typeof item.name_en !== "string") continue;
-    const slug = localSlugAliases[item.id] ?? item.id;
+  for (const slug of FREE_EXERCISE_SLUGS) {
+    const item = sourceBySlug.get(slug);
     const equipment = list(item.equipment).map(slugify);
     if (item.is_bodyweight && !equipment.includes("BODYWEIGHT")) equipment.push("BODYWEIGHT");
     const instructions = list(item.instructions_en);
@@ -51,8 +61,12 @@ async function main() {
     const existing = await prisma.exercise.findUnique({ where: { slug }, select: { id: true, primaryMuscles: true } });
     const exercise = await prisma.exercise.upsert({
       where: { slug },
-      // Re-running the import must not overwrite exercise edits made by an admin.
-      update: !existing || isJsonArray(existing.primaryMuscles) ? {} : { primaryMuscles: primaryMusclesJson, secondaryMuscles: secondaryMusclesJson, equipment: equipmentJson },
+      update: {
+        isActive: true,
+        ...(!existing || isJsonArray(existing.primaryMuscles)
+          ? {}
+          : { primaryMuscles: primaryMusclesJson, secondaryMuscles: secondaryMusclesJson, equipment: equipmentJson }),
+      },
       create: {
         name: item.name_en,
         slug,
@@ -68,14 +82,35 @@ async function main() {
     });
     imported += 1;
 
+    const localAnimationUrl = FREE_ANIMATION_MEDIA[slug];
+    const existingLocal = await prisma.exerciseMedia.findFirst({
+      where: { exerciseId: exercise.id, url: localAnimationUrl },
+      select: { id: true },
+    });
+    if (!existingLocal) {
+      await prisma.exerciseMedia.create({
+        data: {
+          exerciseId: exercise.id,
+          type: "IMAGE",
+          url: localAnimationUrl,
+          sourceName: localAnimationSource,
+          sourceUrl: "https://github.com/RepDB/exercise-dataset",
+          license: "Use only the supplied free animation pack; attribution follows the pack/source terms.",
+          attribution: "Exercise data by RepDB (repdb.co)",
+          isPrimary: true,
+        },
+      });
+      mediaCount += 1;
+    }
+
+    // Keep the free RepDB pose illustrations available as fallback/reference media,
+    // but never import media for exercises outside the supplied allowlist.
     const poses = item.images?.flat ?? {};
     const imagePaths = [...new Set([poses.start, poses.peak, poses.main].filter(path => typeof path === "string" && path.startsWith("images/")))];
     for (const imagePath of imagePaths) {
       const url = new URL(imagePath, imageBase).toString();
       const existingMedia = await prisma.exerciseMedia.findFirst({ where: { exerciseId: exercise.id, sourceName: "RepDB", url }, select: { id: true } });
       if (existingMedia) continue;
-      const hasCustomPrimary = await prisma.exerciseMedia.findFirst({ where: { exerciseId: exercise.id, isPrimary: true, sourceName: { not: "RepDB" } }, select: { id: true } });
-      const hasAnyPrimary = hasCustomPrimary || await prisma.exerciseMedia.findFirst({ where: { exerciseId: exercise.id, isPrimary: true }, select: { id: true } });
       await prisma.exerciseMedia.create({
         data: {
           exerciseId: exercise.id,
@@ -85,15 +120,15 @@ async function main() {
           sourceUrl: `https://exercise-dataset.com/exercise/${item.id}/`,
           license: "RepDB Free Tier License v1.0; in-app use with attribution",
           attribution: "Exercise data by RepDB (repdb.co)",
-          isPrimary: !hasAnyPrimary && imagePath === imagePaths[0],
+          isPrimary: false,
         },
       });
       mediaCount += 1;
     }
   }
 
-  console.log(`Imported ${imported} RepDB exercises and linked ${mediaCount} illustration files.`);
-  console.log("The free-tier illustrations are static WebP poses, not animated GIFs.");
+  console.log(`Imported ${imported} supplied exercises (${FREE_EXERCISE_SLUGS.length} allowed) and linked ${mediaCount} media records.`);
+  console.log("Only the supplied exercise slugs are active for plan generation.");
 }
 
 try {

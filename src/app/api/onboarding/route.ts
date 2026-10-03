@@ -5,7 +5,7 @@ import { generateAndAssignPlan } from "@/lib/program-generator";
 
 const GOAL_MAP: Record<string, "FAT_LOSS" | "MUSCLE_GAIN" | "RECOMPOSITION" | "STRENGTH"> = {
   "RECOMP": "RECOMPOSITION",
-  "FAT LOSS": "FAT_LOSS",
+  "FAT LOSS": "FAT LOSS",
   "MUSCLE": "MUSCLE_GAIN",
   "STRENGTH": "STRENGTH",
 };
@@ -78,6 +78,12 @@ export async function PUT(request: Request) {
     : [...ALLOWED_EQUIPMENT];
   const environment = equipment.length === ALLOWED_EQUIPMENT.length ? "COMMERCIAL_GYM" : "CUSTOM";
 
+  const previousOnboarding = await prisma.onboardingResponse.findUnique({
+    where: { userId: user.id },
+    select: { completedAt: true },
+  });
+  const previousCompletedAt = previousOnboarding?.completedAt ?? null;
+
   const profile = await prisma.profile.upsert({
     where: { userId: user.id },
     update: {
@@ -122,12 +128,26 @@ export async function PUT(request: Request) {
     },
   });
 
-  const plan = completing ? await generateAndAssignPlan(user.id) : null;
+  let plan = null;
+  if (completing) {
+    try {
+      plan = await generateAndAssignPlan(user.id);
+    } catch (error) {
+      // Do not leave a user in a completed onboarding state when the plan could
+      // not be generated. The next attempt should be able to retry cleanly.
+      await prisma.onboardingResponse.update({
+        where: { userId: user.id },
+        data: { completedAt: previousCompletedAt },
+      });
+      const message = error instanceof Error ? error.message : "Non è stato possibile generare il programma.";
+      return NextResponse.json({ error: message }, { status: 422 });
+    }
+  }
 
   return NextResponse.json({
     profile,
-    onboarding,
-    completed: Boolean(onboarding.completedAt),
+    onboarding: plan ? { ...onboarding, completedAt: new Date() } : onboarding,
+    completed: Boolean(plan || onboarding.completedAt),
     plan,
   });
 }

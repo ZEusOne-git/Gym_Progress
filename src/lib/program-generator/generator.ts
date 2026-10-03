@@ -1,5 +1,6 @@
 import { getSplit } from "./splits";
 import { selectExercises } from "./catalog";
+import { FREE_EXERCISE_SET } from "./free-exercise-catalog";
 import type { GeneratedDay, GeneratedExercise, PlanPreferences, ExerciseCandidate, MusclePriority } from "./types";
 
 const prescriptionFor = (preferences: PlanPreferences) => {
@@ -28,10 +29,8 @@ function coverageScore(candidate: ExerciseCandidate, focus: MusclePriority[], pr
     if (priorities.has(group)) score += 6;
     score -= (counts.get(group) ?? 0) * 3;
   }
-  // Free media is preferred when available, but media never makes an exercise mandatory.
   if (candidate.hasVideoMedia) score += 4;
   else if (candidate.hasStaticMedia) score += 1;
-  // Avoid turning a six-day plan into the same small list of exercises.
   score -= (usedThisWeek.get(candidate.id) ?? 0) * 16;
   return score;
 }
@@ -54,8 +53,6 @@ function pickBest(pool: ExerciseCandidate[], selected: ExerciseCandidate[], focu
     .filter((candidate) => !selected.some((item) => item.id === candidate.id))
     .filter((candidate) => !muscle || normalizedMuscles(candidate.muscleGroups).includes(muscle));
 
-  // Prefer exercises that have not appeared yet this week. If the catalog is too small,
-  // allow a second appearance rather than producing an incomplete workout.
   const fresh = candidates.filter((candidate) => (usedThisWeek.get(candidate.id) ?? 0) === 0);
   const reusable = candidates.filter((candidate) => (usedThisWeek.get(candidate.id) ?? 0) < 2);
   const source = fresh.length ? fresh : reusable.length ? reusable : candidates;
@@ -70,21 +67,24 @@ export function generatePlan(preferences: PlanPreferences, candidates: ExerciseC
   const usedThisWeek = new Map<string, number>();
   const exercisesPerDay = Math.min(exercisesForSession(preferences), preferences.experience === "BEGINNER" ? 6 : 7);
 
+  // Defense in depth: the persisted generator already queries the free catalog,
+  // but the pure generator must also reject anything outside the 22-exercise
+  // allowlist when called from another entry point or future code path.
+  const freeCandidates = candidates.filter((candidate) => FREE_EXERCISE_SET.has(candidate.slug));
+  if (freeCandidates.length === 0) throw new Error("Il catalogo free non contiene esercizi utilizzabili.");
+
   const days = split.map((splitDay) => {
     const focus = [...splitDay.focus].sort((a, b) => Number(priorities.has(b)) - Number(priorities.has(a)));
-    const pool = selectExercises(candidates, preferences, focus, Math.max(candidates.length, exercisesPerDay * 6));
+    const pool = selectExercises(freeCandidates, preferences, focus, Math.max(freeCandidates.length, exercisesPerDay * 6));
     const selected: ExerciseCandidate[] = [];
     const counts = new Map<MusclePriority, number>();
 
-    // First guarantee the user's selected priorities are represented whenever the
-    // catalog contains a compatible exercise for that muscle.
     for (const priority of priorities) {
       if (!focus.includes(priority) || selected.length >= exercisesPerDay) continue;
       const match = pickBest(pool, selected, focus, priorities, counts, usedThisWeek, priority);
       if (match) addCandidate(match, selected, counts);
     }
 
-    // Then fill the session according to the split, balancing muscle coverage and media.
     for (const muscle of focus) {
       if (selected.length >= exercisesPerDay) break;
       const match = pickBest(pool, selected, focus, priorities, counts, usedThisWeek, muscle);

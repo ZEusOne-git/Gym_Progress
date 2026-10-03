@@ -25,10 +25,15 @@ async function createCalendar(tx: Prisma.TransactionClient, userId: string, plan
   const today = dayStart(new Date());
   const firstMonday = monday(today);
   const rows: { userId: string; workoutPlanId: string; templateId: string; scheduledDate: Date }[] = [];
-  for (let week = 0; week < 8; week += 1) {
+
+  // Generate a full planning horizon so onboarding immediately produces a
+  // usable calendar instead of only a short preview. Future unsessioned rows
+  // are replaced atomically when the user regenerates the plan.
+  for (let week = 0; week < 12; week += 1) {
     const base = new Date(firstMonday.getFullYear(), firstMonday.getMonth(), firstMonday.getDate() + week * 7);
     trainingWeekdays[days].forEach((weekday, index) => {
       const date = new Date(base.getFullYear(), base.getMonth(), base.getDate() + weekday - 1);
+      date.setHours(12, 0, 0, 0);
       if (date >= today) rows.push({ userId, workoutPlanId: planId, templateId: templateIds[index], scheduledDate: date });
     });
   }
@@ -51,18 +56,18 @@ export async function generateAndAssignPlan(userId: string) {
   return prisma.$transaction(async (tx) => {
     const today = dayStart(new Date());
     // Only generated plans belong to this regeneration flow. Public/assigned
-    // templates must remain available in the catalog even when a personalized
-    // plan replaces the user's current schedule.
+    // templates remain available in the catalog even when a personalized plan
+    // replaces the user's current schedule.
     const activePlans = await tx.workoutPlan.findMany({ where: { userId, isActive: true, isTemplate: false }, select: { id: true } });
     const activePlanIds = activePlans.map((plan) => plan.id);
     if (activePlanIds.length) {
       await tx.workoutPlan.updateMany({ where: { id: { in: activePlanIds } }, data: { isActive: false } });
       // Never delete a schedule that already has a session: completed history
-      // (and an early-terminated workout) must remain attached to the old plan.
+      // and early-terminated workouts stay attached to the old plan.
       await tx.workoutSchedule.deleteMany({ where: { userId, workoutPlanId: { in: activePlanIds }, scheduledDate: { gte: today }, session: { is: null } } });
     }
     const plan = await tx.workoutPlan.create({
-      data: { userId, name: generated.name, isActive: true, isTemplate: false, templates: { create: generated.days.map((day, i) => ({ dayNumber: i + 1, name: day.name, estimatedMins: preferences.sessionMinutes, exercises: { create: day.exercises.map((exercise, orderIndex) => ({ exerciseId: exercise.exerciseId, orderIndex, sets: exercise.sets, repMin: exercise.repMin, repMax: exercise.repMax, rirTarget: exercise.rir, restSeconds: exercise.restSeconds, progressionType: "DOUBLE_PROGRESSION" })) } })) } },
+      data: { userId, name: generated.name, version: 1, isActive: true, isTemplate: false, templates: { create: generated.days.map((day, i) => ({ dayNumber: i + 1, name: day.name, estimatedMins: preferences.sessionMinutes, exercises: { create: day.exercises.map((exercise, orderIndex) => ({ exerciseId: exercise.exerciseId, orderIndex, sets: exercise.sets, repMin: exercise.repMin, repMax: exercise.repMax, rirTarget: exercise.rir, restSeconds: exercise.restSeconds, progressionType: "DOUBLE_PROGRESSION" })) } })) } },
       include: { templates: { orderBy: { dayNumber: "asc" }, select: { id: true, dayNumber: true, name: true } } },
     });
     await createCalendar(tx, userId, plan.id, plan.templates.map((template) => template.id), days);

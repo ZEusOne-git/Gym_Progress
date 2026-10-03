@@ -53,8 +53,12 @@ for (const item of exercises) {
 const adminEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase();
 const adminPassword = process.env.ADMIN_PASSWORD;
 
+if (Boolean(adminEmail) !== Boolean(adminPassword)) {
+  throw new Error("Set both ADMIN_EMAIL and ADMIN_PASSWORD to bootstrap the admin account.");
+}
+
 if (adminEmail && adminPassword) {
-  if (adminPassword.length < 8) throw new Error("ADMIN_PASSWORD must be at least 8 characters.");
+  if (adminPassword.length < 12) throw new Error("ADMIN_PASSWORD must be at least 12 characters.");
   const existing = await prisma.user.findUnique({ where: { email: adminEmail } });
   if (existing) {
     if (process.env.NODE_ENV === "production") {

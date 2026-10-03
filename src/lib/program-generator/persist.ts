@@ -50,11 +50,16 @@ export async function generateAndAssignPlan(userId: string) {
 
   return prisma.$transaction(async (tx) => {
     const today = dayStart(new Date());
-    const activePlans = await tx.workoutPlan.findMany({ where: { userId, isActive: true }, select: { id: true } });
+    // Only generated plans belong to this regeneration flow. Public/assigned
+    // templates must remain available in the catalog even when a personalized
+    // plan replaces the user's current schedule.
+    const activePlans = await tx.workoutPlan.findMany({ where: { userId, isActive: true, isTemplate: false }, select: { id: true } });
     const activePlanIds = activePlans.map((plan) => plan.id);
     if (activePlanIds.length) {
       await tx.workoutPlan.updateMany({ where: { id: { in: activePlanIds } }, data: { isActive: false } });
-      await tx.workoutSchedule.deleteMany({ where: { userId, workoutPlanId: { in: activePlanIds }, scheduledDate: { gte: today } } });
+      // Never delete a schedule that already has a session: completed history
+      // (and an early-terminated workout) must remain attached to the old plan.
+      await tx.workoutSchedule.deleteMany({ where: { userId, workoutPlanId: { in: activePlanIds }, scheduledDate: { gte: today }, session: { is: null } } });
     }
     const plan = await tx.workoutPlan.create({
       data: { userId, name: generated.name, isActive: true, isTemplate: false, templates: { create: generated.days.map((day, i) => ({ dayNumber: i + 1, name: day.name, estimatedMins: preferences.sessionMinutes, exercises: { create: day.exercises.map((exercise, orderIndex) => ({ exerciseId: exercise.exerciseId, orderIndex, sets: exercise.sets, repMin: exercise.repMin, repMax: exercise.repMax, rirTarget: exercise.rir, restSeconds: exercise.restSeconds, progressionType: "DOUBLE_PROGRESSION" })) } })) } },

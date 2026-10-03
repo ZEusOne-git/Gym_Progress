@@ -13,6 +13,7 @@
     "db:seed": "node prisma/seed.mjs && node prisma/import-repdb-exercises.mjs && node prisma/seed-programs.mjs",
     "db:seed:test": "node prisma/seed-test-program.mjs",
     "db:import:repdb": "node prisma/import-repdb-exercises.mjs",
+    "animations:install": "node scripts/install-free-animations.mjs",
     "db:studio": "prisma studio",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
@@ -30,15 +31,15 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.1",
+    "eslint": "^9.25.0",
+    "eslint-config-next": "^15.5.0",
+    "postcss": "^8.5.0",
+    "tailwindcss": "^4.1.4",
+    "typescript": "^5.8.3",
+    "@tailwindcss/postcss": "^4.1.14",
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
-    "@tailwindcss/postcss": "^4.1.14",
-    "eslint": "^9.25.0",
-    "eslint-config-next": "^15.5.0",
-    "postcss": "^8.5.6",
-    "prisma": "^6.7.0",
-    "tailwindcss": "^4.1.4",
-    "typescript": "^5.8.3"
+    "prisma": "^6.7.0"
   }
 }

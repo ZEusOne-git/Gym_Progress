@@ -1,6 +1,6 @@
 import { getSplit } from "./splits";
 import { selectExercises } from "./catalog";
-import type { GeneratedDay, GeneratedExercise, MusclePriority, PlanPreferences, ExerciseCandidate } from "./types";
+import type { GeneratedDay, GeneratedExercise, PlanPreferences, ExerciseCandidate } from "./types";
 
 const prescriptionFor = (preferences: PlanPreferences) => {
   switch (preferences.goal) {

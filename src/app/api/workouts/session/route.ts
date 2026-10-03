@@ -26,7 +26,6 @@ async function regeneratePendingPlan(userId: string) {
 
   try {
     await generateAndAssignPlan(userId);
-
     let preferences: Record<string, unknown> = {};
     try {
       const parsed = JSON.parse(onboarding?.preferencesJson ?? "{}");
@@ -71,19 +70,24 @@ export async function POST(request: Request) {
     const requestedDate = parseDate(body.date);
     const todayStart = new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate());
 
-    // A workout started from the calendar must use that exact occurrence.
-    // A generic "Allenati" entry point can use the next free occurrence of
-    // the selected template. This also makes older generated plans usable if
-    // their calendar rows were not created by an earlier version of the app.
     let schedule = requestedDate
       ? await prisma.workoutSchedule.findFirst({ where: { userId: user.id, workoutPlanId: template.workoutPlanId, templateId: template.id, scheduledDate: requestedDate }, select: { id: true, scheduledDate: true } })
       : await prisma.workoutSchedule.findFirst({ where: { userId: user.id, workoutPlanId: template.workoutPlanId, templateId: template.id, scheduledDate: { gte: todayStart }, session: { is: null } }, orderBy: { scheduledDate: "asc" }, select: { id: true, scheduledDate: true } });
 
-    // Do not turn a missing schedule into a hard 409 for a generic start.
-    // Backfill one future occurrence atomically, preserving the unique
-    // (userId, scheduledDate) calendar invariant. Explicit calendar dates
-    // still require an existing occurrence so a typo cannot create a hidden
-    // workout on the wrong day.
+    // Generated plans can be opened directly before their calendar rows have
+    // been materialized. If the requested day is free, materialize that exact
+    // occurrence; otherwise preserve the calendar uniqueness invariant.
+    if (!schedule && requestedDate) {
+      const occupiedDate = await prisma.workoutSchedule.findFirst({ where: { userId: user.id, scheduledDate: requestedDate }, select: { id: true } });
+      if (!occupiedDate) {
+        try {
+          schedule = await prisma.workoutSchedule.create({ data: { userId: user.id, workoutPlanId: template.workoutPlanId, templateId: template.id, scheduledDate: requestedDate }, select: { id: true, scheduledDate: true } });
+        } catch {
+          schedule = await prisma.workoutSchedule.findFirst({ where: { userId: user.id, workoutPlanId: template.workoutPlanId, templateId: template.id, scheduledDate: requestedDate }, select: { id: true, scheduledDate: true } });
+        }
+      }
+    }
+
     if (!schedule && !requestedDate) {
       for (let offset = 0; offset < 84 && !schedule; offset += 1) {
         const candidateDate = new Date(todayStart);
@@ -94,8 +98,7 @@ export async function POST(request: Request) {
         try {
           schedule = await prisma.workoutSchedule.create({ data: { userId: user.id, workoutPlanId: template.workoutPlanId, templateId: template.id, scheduledDate: candidateDate }, select: { id: true, scheduledDate: true } });
         } catch {
-          // Another request may have claimed this calendar date between the
-          // lookup and insert. Continue with the next available date.
+          // Another request may have claimed this calendar date; keep looking.
         }
       }
     }
@@ -105,7 +108,9 @@ export async function POST(request: Request) {
     const result = await prisma.$transaction(async (tx) => {
       const open = await tx.workoutSession.findFirst({ where: { userId: user.id, completedAt: null }, orderBy: { startedAt: "desc" }, include: { schedule: { select: { id: true, templateId: true } } } });
       if (open) {
-        const sameWorkout = open.workoutPlanId === template.workoutPlanId && open.scheduleId === schedule.id;
+        // Starting the same generated plan twice should be idempotent even if
+        // the calendar occurrence changed underneath the active session.
+        const sameWorkout = open.workoutPlanId === template.workoutPlanId;
         if (!sameWorkout) {
           return { conflict: NextResponse.json({ error: "Hai già un allenamento in corso. Riprendilo o terminalo prima di iniziarne un altro." }, { status: 409 }) };
         }

@@ -4,10 +4,11 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Check, ChevronRight, Dumbbell, Sparkles } from "lucide-react";
 
+type Exercise = { exercise: { id: string; name: string; equipment: string }; sets: number; repMin: number | null; repMax: number | null };
 type Plan = {
   id: string;
   name: string;
-  templates: { id: string; dayNumber: number; name: string; estimatedMins: number | null; _count: { exercises: number } }[];
+  templates: { id: string; dayNumber: number; name: string; estimatedMins: number | null; _count: { exercises: number }; exercises?: Exercise[] }[];
   equipmentFit?: { total: number; compatible: number; unsupported: string[]; percent: number };
   trainingDaysFit?: boolean;
 };
@@ -79,9 +80,12 @@ export default function ProgramsPage() {
             </div>
             <div className="mt-5 divide-y divide-[var(--border)] border-y border-[var(--border)]">
               {activePlan.templates.map(template => (
-                <div key={template.id} className="flex min-h-16 items-center justify-between gap-4 py-3.5">
-                  <div className="min-w-0"><p className="text-[9px] font-black uppercase tracking-[0.18em] text-[var(--muted)]">Giorno {template.dayNumber}</p><p className="mt-1 truncate text-sm font-black sm:text-base">{template.name}</p></div>
-                  <div className="flex shrink-0 items-center gap-2 text-[10px] font-bold text-[var(--muted)]"><span>{template._count.exercises} esercizi</span>{template.estimatedMins ? <span>· {template.estimatedMins} min</span> : null}<ChevronRight size={14} /></div>
+                <div key={template.id} className="py-4">
+                  <div className="flex min-h-12 items-center justify-between gap-4">
+                    <div className="min-w-0"><p className="text-[9px] font-black uppercase tracking-[0.18em] text-[var(--muted)]">Giorno {template.dayNumber}</p><p className="mt-1 truncate text-sm font-black sm:text-base">{template.name}</p></div>
+                    <div className="flex shrink-0 items-center gap-2 text-[10px] font-bold text-[var(--muted)]"><span>{template._count.exercises} esercizi</span>{template.estimatedMins ? <span>· {template.estimatedMins} min</span> : null}</div>
+                  </div>
+                  {template.exercises?.length ? <div className="mt-3 grid gap-x-4 gap-y-2 sm:grid-cols-2">{template.exercises.map((item, index) => <div key={`${template.id}-${item.exercise.id}-${index}`} className="flex min-w-0 items-center gap-3 rounded-xl bg-[var(--surface)]/40 px-3 py-2.5"><span className="w-5 shrink-0 text-center text-[9px] font-black text-[var(--muted)]">{index + 1}</span><div className="min-w-0 flex-1"><p className="truncate text-xs font-black">{item.exercise.name}</p><p className="mt-0.5 text-[9px] font-bold text-[var(--muted)]">{item.sets} serie{item.repMin ? ` · ${item.repMin}${item.repMax ? `–${item.repMax}` : ""} rip` : ""}</p></div></div>)}</div> : null}
                 </div>
               ))}
             </div>

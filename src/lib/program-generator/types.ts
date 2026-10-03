@@ -25,6 +25,15 @@ export type PlanPreferences = {
   priorities?: MusclePriority[]
 }
 
+export type ExerciseCandidate = {
+  id: string
+  muscleGroups: MusclePriority[]
+  equipment: string[]
+  hasStaticMedia: boolean
+  hasVideoMedia: boolean
+  isActive?: boolean
+}
+
 export type SplitDay = {
   name: string
   focus: MusclePriority[]

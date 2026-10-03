@@ -38,6 +38,7 @@ export default function ExercisePlayer({ exercise, exerciseIndex, totalExercises
   const [seconds, setSeconds] = useState(Math.max(exercise.rest || 120, 1));
   const [paused, setPaused] = useState(false);
   const [poseIndex, setPoseIndex] = useState(0);
+  const [showInstructions, setShowInstructions] = useState(false);
 
   const media = exercise.media?.length ? exercise.media : exercise.mediaUrl ? [{ url: exercise.mediaUrl, type: exercise.mediaType || "IMAGE", attribution: exercise.attribution, sourceUrl: exercise.sourceUrl }] : [];
   const imageMedia = media.filter(item => item.type === "IMAGE");
@@ -73,6 +74,20 @@ export default function ExercisePlayer({ exercise, exerciseIndex, totalExercises
     if (!paused && !isComplete) video.play().catch(() => undefined);
     else video.pause();
   }, [paused, isComplete, activeMedia?.url]);
+
+  useEffect(() => {
+    if (!showInstructions) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setShowInstructions(false);
+    };
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [showInstructions]);
 
   function completeSet() {
     if (isComplete) return;
@@ -123,16 +138,24 @@ export default function ExercisePlayer({ exercise, exerciseIndex, totalExercises
           <div className="mx-auto mb-4 h-1 w-9 rounded-full bg-white/15" />
           <div className="text-center">
             <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-white/40">{exercise.name}</p>
-            {(activeMedia?.attribution || exercise.attribution) && <a href={activeMedia?.sourceUrl || exercise.sourceUrl || "#"} target={(activeMedia?.sourceUrl || exercise.sourceUrl) ? "_blank" : undefined} rel={(activeMedia?.sourceUrl || exercise.sourceUrl) ? "noreferrer" : undefined} className="mt-1 inline-flex text-[9px] font-semibold text-white/45 underline decoration-white/25 underline-offset-2">Dimostrazione: {activeMedia?.attribution || exercise.attribution}</a>}
             <p className="mt-2 text-[46px] font-light leading-none tracking-[-0.04em] tabular-nums">{timer}</p>
             <div className="mt-2 flex items-center justify-center gap-2 text-[11px] font-semibold text-white/55">
               <span>Serie {setProgress}</span><span className="h-1 w-1 rounded-full bg-white/25" /><span>{exercise.reps} reps</span>
             </div>
           </div>
 
-          <div className="mt-5 flex items-center justify-center">
+          <div className="mt-4 flex items-center justify-center gap-2">
             <button type="button" onClick={() => setPaused(value => !value)} className="flex h-11 min-w-32 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] px-5 text-xs font-extrabold transition active:scale-[.98]">
               <span className="mr-2 text-sm">{paused ? "▶" : "Ⅱ"}</span>{paused ? "Riprendi" : "Pausa"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowInstructions(true)}
+              aria-haspopup="dialog"
+              aria-expanded={showInstructions}
+              className="flex h-11 items-center justify-center rounded-full border border-[#d7ff00]/30 bg-[#d7ff00]/10 px-5 text-xs font-black uppercase tracking-[0.08em] text-[#d7ff00] transition active:scale-[.98]"
+            >
+              Come si fa
             </button>
           </div>
 
@@ -156,6 +179,71 @@ export default function ExercisePlayer({ exercise, exerciseIndex, totalExercises
           )}
         </section>
       </section>
+
+      {showInstructions && (
+        <div
+          className="fixed inset-0 z-[100] flex items-end justify-center bg-black/75 p-3 backdrop-blur-sm sm:items-center"
+          role="presentation"
+          onMouseDown={event => {
+            if (event.target === event.currentTarget) setShowInstructions(false);
+          }}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="exercise-instructions-title"
+            className="flex max-h-[82vh] w-full max-w-[430px] flex-col overflow-hidden rounded-[28px] border border-white/10 bg-[#12201e] shadow-2xl"
+          >
+            <header className="flex shrink-0 items-center justify-between border-b border-white/10 px-5 py-4">
+              <div>
+                <p className="text-[9px] font-black uppercase tracking-[0.18em] text-[#d7ff00]">Istruzioni</p>
+                <h2 id="exercise-instructions-title" className="mt-1 text-xl font-bold tracking-tight">Come si fa</h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowInstructions(false)}
+                aria-label="Chiudi istruzioni"
+                className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-xl text-white/80 transition active:scale-95"
+              >
+                ×
+              </button>
+            </header>
+
+            <div className="overflow-y-auto px-5 py-5">
+              <h3 className="text-base font-bold">{exercise.name}</h3>
+
+              {exercise.instructions.length > 0 && (
+                <div className="mt-5">
+                  <p className="text-[9px] font-black uppercase tracking-[0.16em] text-white/40">Esecuzione</p>
+                  <ol className="mt-3 space-y-3">
+                    {exercise.instructions.map((instruction, index) => (
+                      <li key={`${instruction}-${index}`} className="flex gap-3 text-sm leading-6 text-white/80">
+                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#d7ff00]/15 text-[10px] font-black text-[#d7ff00]">{index + 1}</span>
+                        <span>{instruction}</span>
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              )}
+
+              {exercise.cues.length > 0 && (
+                <div className="mt-6 rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+                  <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#d7ff00]">Focus</p>
+                  <ul className="mt-2 space-y-2">
+                    {exercise.cues.map((cue, index) => (
+                      <li key={`${cue}-${index}`} className="text-sm leading-5 text-white/70">• {cue}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+
+            <footer className="shrink-0 border-t border-white/10 p-3">
+              <button type="button" onClick={() => setShowInstructions(false)} className="w-full rounded-2xl bg-white py-3.5 text-sm font-black text-black transition active:scale-[.99]">CHIUDI</button>
+            </footer>
+          </section>
+        </div>
+      )}
     </main>
   );
 }

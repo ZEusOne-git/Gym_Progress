@@ -159,7 +159,11 @@ export async function POST(request: Request) {
   const { today, monday } = nextMonday();
 
   const result = await prisma.$transaction(async tx => {
+    const openSession = await tx.workoutSession.findFirst({ where: { userId: user.id, completedAt: null }, select: { id: true } });
+    if (openSession) return null;
+
     await tx.workoutSchedule.deleteMany({ where: { userId: user.id, scheduledDate: { gte: today }, session: { is: null } } });
+    await tx.workoutSchedule.deleteMany({ where: { userId: user.id, scheduledDate: { gte: monday }, session: { is: { completedAt: { not: null } } } } });
     await tx.workoutPlan.updateMany({ where: { userId: user.id, isActive: true, isTemplate: false }, data: { isActive: false } });
     const plan = await tx.workoutPlan.create({
       data: {
@@ -211,6 +215,8 @@ export async function POST(request: Request) {
     await tx.workoutSchedule.createMany({ data: schedules });
     return plan;
   });
+
+  if (!result) return NextResponse.json({ error: "Riprendi e completa o termina l'allenamento in corso prima di cambiare programma." }, { status: 409 });
 
   return NextResponse.json({
     plan: result,

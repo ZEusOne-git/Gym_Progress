@@ -35,7 +35,27 @@ const generatedTemplateSelect = {
   _count: { select: { exercises: true } },
   exercises: {
     orderBy: { orderIndex: "asc" as const },
-    select: { exercise: { select: { id: true, name: true, equipment: true } }, sets: true, repMin: true, repMax: true },
+    select: {
+      exercise: {
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          equipment: true,
+          media: {
+            where: { isActive: true },
+            orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }],
+            select: { type: true, url: true, thumbnailUrl: true, sourceName: true, sourceUrl: true, attribution: true },
+          },
+        },
+      },
+      sets: true,
+      repMin: true,
+      repMax: true,
+      restSeconds: true,
+      rirTarget: true,
+      notes: true,
+    },
   },
 };
 

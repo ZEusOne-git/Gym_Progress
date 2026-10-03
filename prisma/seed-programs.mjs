@@ -1,67 +1,49 @@
 import { PrismaClient } from "@prisma/client";
+import { FREE_EXERCISE_SET } from "./free-exercise-catalog.mjs";
 
 const prisma = new PrismaClient();
 
 const entry = (slug, sets, repMin, repMax, restSeconds = 90, loadIncrement = null) => ({ slug, sets, repMin, repMax, restSeconds, loadIncrement });
+
 const programs = [
   {
     name: "Full body essenziale · 2 giorni (base)",
     days: [
-      { name: "Total body A", estimatedMins: 50, exercises: [entry("barbell-squat", 3, 6, 10, 120, 2.5), entry("bench-press", 3, 6, 10, 120, 2.5), entry("seated-cable-row", 3, 8, 12), entry("romanian-deadlift", 2, 8, 10, 120, 2.5), entry("dead-bug", 3, 8, 12, 60)] },
-      { name: "Total body B", estimatedMins: 50, exercises: [entry("leg-press", 3, 8, 12, 120), entry("dumbbell-bench-press", 3, 8, 12, 90), entry("lat-pulldown", 3, 8, 12, 90), entry("hip-thrust", 3, 8, 12, 120), entry("dumbbell-curl", 2, 10, 15, 60)] },
+      { name: "Total body A", estimatedMins: 50, exercises: [entry("front-squat", 3, 6, 10, 120, 2.5), entry("decline-db-fly", 3, 8, 12), entry("kneeling-cable-row", 3, 8, 12), entry("barbell-reverse-lunge", 2, 8, 12, 90, 2.5), entry("ab-wheel-rollout", 2, 6, 12, 60)] },
+      { name: "Total body B", estimatedMins: 50, exercises: [entry("smith-machine-front-squat", 3, 8, 12, 120), entry("machine-chest-fly", 3, 8, 12, 90), entry("reverse-grip-lat-pulldown", 3, 8, 12, 90), entry("bent-over-db-row", 3, 8, 12, 90), entry("bicep-curl", 2, 10, 15, 60)] },
     ],
   },
   {
     name: "Full body · 3 giorni (base)",
     days: [
-      { name: "Total body A", estimatedMins: 55, exercises: [entry("barbell-squat", 3, 6, 10, 120, 2.5), entry("bench-press", 3, 6, 10, 120, 2.5), entry("seated-cable-row", 3, 8, 12), entry("hip-thrust", 2, 8, 12), entry("cable-triceps-pushdown", 2, 10, 15, 60)] },
-      { name: "Total body B", estimatedMins: 55, exercises: [entry("leg-press", 3, 8, 12, 120), entry("shoulder-press", 3, 8, 12, 90), entry("lat-pulldown", 3, 8, 12, 90), entry("romanian-deadlift", 3, 8, 10, 120), entry("dead-bug", 3, 8, 12, 60)] },
-      { name: "Total body C", estimatedMins: 55, exercises: [entry("split-squat", 3, 8, 12, 90), entry("dumbbell-bench-press", 3, 8, 12, 90), entry("chest-supported-row", 3, 8, 12, 90), entry("leg-curl", 2, 10, 15, 60), entry("lateral-raise", 2, 12, 15, 60)] },
-    ],
-  },
-  {
-    name: "Full body con manubri · 2 giorni (base)",
-    days: [
-      { name: "Total body A", estimatedMins: 50, exercises: [entry("goblet-squat", 3, 8, 12, 90), entry("dumbbell-floor-press", 3, 8, 12, 90), entry("single-arm-db-row", 3, 8, 12, 90), entry("dumbbell-romanian-deadlift", 3, 8, 12, 90), entry("dead-bug", 2, 8, 12, 60)] },
-      { name: "Total body B", estimatedMins: 50, exercises: [entry("dumbbell-split-squat", 3, 8, 12, 90), entry("dumbbell-shoulder-press", 3, 8, 12, 90), entry("bent-over-db-row", 3, 8, 12, 90), entry("glute-bridge", 3, 10, 15, 60), entry("dumbbell-curl", 2, 10, 15, 60), entry("dead-bug", 2, 8, 12, 60)] },
+      { name: "Total body A", estimatedMins: 55, exercises: [entry("front-squat", 3, 6, 10, 120, 2.5), entry("decline-db-fly", 3, 8, 12), entry("kneeling-cable-row", 3, 8, 12), entry("single-arm-tricep-pushdown", 2, 10, 15, 60)] },
+      { name: "Total body B", estimatedMins: 55, exercises: [entry("smith-machine-front-squat", 3, 8, 12, 120), entry("ez-bar-upright-row", 3, 8, 12, 90), entry("pull-up", 3, 5, 10, 90), entry("one-arm-kettlebell-row", 3, 8, 12, 90), entry("mountain-climbers", 3, 20, 40, 60)] },
+      { name: "Total body C", estimatedMins: 55, exercises: [entry("barbell-reverse-lunge", 3, 8, 12, 90), entry("machine-chest-fly", 3, 8, 12, 90), entry("reverse-grip-lat-pulldown", 3, 8, 12, 90), entry("incline-db-curl", 2, 10, 15, 60), entry("side-lying-lateral-raise", 2, 12, 15, 60)] },
     ],
   },
   {
     name: "Upper / Lower · 4 giorni (intermedio)",
     days: [
-      { name: "Upper A", estimatedMins: 55, exercises: [entry("bench-press", 4, 6, 10, 120, 2.5), entry("lat-pulldown", 3, 8, 12, 90), entry("seated-cable-row", 3, 8, 12, 90), entry("lateral-raise", 3, 12, 15, 60), entry("dumbbell-curl", 2, 10, 15, 60), entry("cable-triceps-pushdown", 2, 10, 15, 60)] },
-      { name: "Lower A", estimatedMins: 55, exercises: [entry("barbell-squat", 4, 6, 10, 150), entry("romanian-deadlift", 3, 8, 10, 120), entry("leg-press", 3, 10, 12, 120), entry("leg-curl", 3, 10, 15, 75), entry("standing-calf-raise", 3, 10, 15, 60)] },
-      { name: "Upper B", estimatedMins: 55, exercises: [entry("dumbbell-bench-press", 3, 8, 12, 90), entry("chest-supported-row", 4, 8, 12, 90), entry("shoulder-press", 3, 8, 12, 90), entry("incline-dumbbell-press", 2, 8, 12, 90), entry("dumbbell-curl", 2, 10, 15, 60), entry("cable-triceps-pushdown", 2, 10, 15, 60)] },
-      { name: "Lower B", estimatedMins: 55, exercises: [entry("split-squat", 3, 8, 12, 90), entry("hip-thrust", 3, 8, 12, 120), entry("leg-extension", 3, 10, 15, 75), entry("leg-curl", 3, 10, 15, 75), entry("standing-calf-raise", 3, 10, 15, 60)] },
+      { name: "Upper A", estimatedMins: 55, exercises: [entry("decline-db-fly", 4, 8, 12, 90), entry("reverse-grip-lat-pulldown", 3, 8, 12), entry("kneeling-cable-row", 3, 8, 12), entry("side-lying-lateral-raise", 3, 12, 15, 60), entry("bicep-curl", 2, 10, 15, 60), entry("single-arm-tricep-pushdown", 2, 10, 15, 60)] },
+      { name: "Lower A", estimatedMins: 55, exercises: [entry("front-squat", 4, 6, 10, 150), entry("barbell-reverse-lunge", 3, 8, 12, 120), entry("smith-machine-front-squat", 3, 10, 12, 120), entry("bench-leg-pull-in", 3, 10, 15, 75)] },
+      { name: "Upper B", estimatedMins: 55, exercises: [entry("machine-chest-fly", 3, 8, 12, 90), entry("bent-over-db-row", 4, 8, 12, 90), entry("ez-bar-upright-row", 3, 8, 12, 90), entry("incline-db-curl", 2, 10, 15, 60), entry("single-arm-tricep-pushdown", 2, 10, 15, 60)] },
+      { name: "Lower B", estimatedMins: 55, exercises: [entry("smith-machine-front-squat", 3, 8, 12, 120), entry("one-arm-kettlebell-row", 3, 8, 12, 90), entry("barbell-reverse-lunge", 3, 8, 12, 90), entry("mountain-climbers", 3, 20, 40, 60)] },
     ],
   },
   {
     name: "Spinta / Trazione / Gambe · 3 giorni (intermedio)",
     days: [
-      { name: "Spinta", estimatedMins: 55, exercises: [entry("bench-press", 4, 6, 10, 120, 2.5), entry("incline-dumbbell-press", 3, 8, 12, 90), entry("shoulder-press", 3, 8, 12, 90), entry("lateral-raise", 3, 12, 15, 60), entry("cable-triceps-pushdown", 3, 10, 15, 60)] },
-      { name: "Trazione", estimatedMins: 55, exercises: [entry("lat-pulldown", 4, 8, 12, 90), entry("seated-cable-row", 3, 8, 12, 90), entry("chest-supported-row", 3, 8, 12, 90), entry("dumbbell-curl", 3, 10, 15, 60), entry("dead-bug", 3, 8, 12, 60)] },
-      { name: "Gambe", estimatedMins: 60, exercises: [entry("barbell-squat", 4, 6, 10, 150), entry("romanian-deadlift", 3, 8, 10, 120), entry("leg-press", 3, 8, 12, 120), entry("leg-curl", 3, 10, 15, 75), entry("standing-calf-raise", 3, 10, 15, 60)] },
+      { name: "Spinta", estimatedMins: 55, exercises: [entry("decline-db-fly", 4, 8, 12, 90), entry("machine-chest-fly", 3, 8, 12, 90), entry("ez-bar-upright-row", 3, 8, 12, 90), entry("side-lying-lateral-raise", 3, 12, 15, 60), entry("single-arm-tricep-pushdown", 3, 10, 15, 60)] },
+      { name: "Trazione", estimatedMins: 55, exercises: [entry("pull-up", 4, 5, 10, 90), entry("reverse-grip-lat-pulldown", 3, 8, 12, 90), entry("kneeling-cable-row", 3, 8, 12, 90), entry("bent-over-db-row", 3, 8, 12, 90), entry("incline-db-curl", 3, 10, 15, 60)] },
+      { name: "Gambe", estimatedMins: 60, exercises: [entry("front-squat", 4, 6, 10, 150), entry("barbell-reverse-lunge", 3, 8, 12, 120), entry("smith-machine-front-squat", 3, 8, 12, 120), entry("bench-leg-pull-in", 3, 10, 15, 60)] },
     ],
   },
   {
-    name: "Upper / Lower · 5 giorni (intermedio)",
+    name: "Condizionamento · 3 giorni (base)",
     days: [
-      { name: "Parte superiore A", estimatedMins: 55, exercises: [entry("bench-press", 3, 6, 10, 120, 2.5), entry("seated-cable-row", 3, 8, 12, 90), entry("lat-pulldown", 2, 8, 12, 90), entry("shoulder-press", 2, 8, 12, 90), entry("dumbbell-curl", 2, 10, 15, 60), entry("cable-triceps-pushdown", 2, 10, 15, 60)] },
-      { name: "Parte inferiore A", estimatedMins: 55, exercises: [entry("barbell-squat", 3, 6, 10, 150, 2.5), entry("romanian-deadlift", 3, 8, 10, 120, 2.5), entry("leg-press", 2, 10, 12, 120), entry("leg-curl", 2, 10, 15, 75), entry("standing-calf-raise", 3, 10, 15, 60), entry("dead-bug", 2, 8, 12, 60)] },
-      { name: "Spinta", estimatedMins: 50, exercises: [entry("dumbbell-bench-press", 3, 8, 12, 90), entry("incline-dumbbell-press", 2, 8, 12, 90), entry("shoulder-press", 2, 8, 12, 90), entry("lateral-raise", 3, 12, 15, 60), entry("cable-triceps-pushdown", 2, 10, 15, 60)] },
-      { name: "Trazione", estimatedMins: 50, exercises: [entry("lat-pulldown", 3, 8, 12, 90), entry("seated-cable-row", 3, 8, 12, 90), entry("chest-supported-row", 2, 8, 12, 90), entry("dumbbell-curl", 3, 10, 15, 60)] },
-      { name: "Parte inferiore B", estimatedMins: 55, exercises: [entry("split-squat", 3, 8, 12, 90), entry("hip-thrust", 3, 8, 12, 120), entry("leg-extension", 2, 10, 15, 75), entry("leg-curl", 3, 10, 15, 75), entry("standing-calf-raise", 3, 10, 15, 60)] },
-    ],
-  },
-  {
-    name: "Spinta / Trazione / Gambe · 6 giorni (avanzato)",
-    days: [
-      { name: "Spinta A", estimatedMins: 50, exercises: [entry("bench-press", 3, 6, 10, 120, 2.5), entry("incline-dumbbell-press", 3, 8, 12, 90), entry("shoulder-press", 2, 8, 12, 90), entry("lateral-raise", 2, 12, 15, 60), entry("cable-triceps-pushdown", 2, 10, 15, 60)] },
-      { name: "Trazione A", estimatedMins: 50, exercises: [entry("lat-pulldown", 3, 8, 12, 90), entry("seated-cable-row", 3, 8, 12, 90), entry("chest-supported-row", 2, 8, 12, 90), entry("dumbbell-curl", 3, 10, 15, 60)] },
-      { name: "Gambe A", estimatedMins: 55, exercises: [entry("barbell-squat", 3, 6, 10, 150, 2.5), entry("romanian-deadlift", 3, 8, 10, 120, 2.5), entry("leg-press", 2, 10, 12, 120), entry("leg-curl", 2, 10, 15, 75), entry("standing-calf-raise", 3, 10, 15, 60)] },
-      { name: "Spinta B", estimatedMins: 50, exercises: [entry("dumbbell-bench-press", 3, 8, 12, 90), entry("shoulder-press", 3, 8, 12, 90), entry("lateral-raise", 3, 12, 15, 60), entry("cable-triceps-pushdown", 3, 10, 15, 60)] },
-      { name: "Trazione B", estimatedMins: 50, exercises: [entry("lat-pulldown", 3, 8, 12, 90), entry("seated-cable-row", 3, 8, 12, 90), entry("chest-supported-row", 2, 8, 12, 90), entry("dumbbell-curl", 3, 10, 15, 60)] },
-      { name: "Gambe B", estimatedMins: 55, exercises: [entry("split-squat", 3, 8, 12, 90), entry("hip-thrust", 3, 8, 12, 120), entry("leg-extension", 2, 10, 15, 75), entry("leg-curl", 2, 10, 15, 75), entry("standing-calf-raise", 3, 10, 15, 60)] },
+      { name: "Engine A", estimatedMins: 40, exercises: [entry("rowing-machine", 4, 3, 5, 90), entry("mountain-climbers", 4, 20, 40, 45), entry("thruster", 3, 8, 12, 90), entry("cat-cow", 2, 8, 12, 30)] },
+      { name: "Engine B", estimatedMins: 40, exercises: [entry("running", 1, 15, 30, 60), entry("thruster", 3, 8, 12, 90), entry("mountain-climbers", 4, 20, 40, 45), entry("ab-wheel-rollout", 2, 6, 12, 60)] },
+      { name: "Engine C", estimatedMins: 40, exercises: [entry("rowing-machine", 4, 3, 5, 90), entry("running", 1, 10, 20, 60), entry("cat-cow", 2, 8, 12, 30), entry("bench-leg-pull-in", 3, 10, 15, 60)] },
     ],
   },
 ];
@@ -77,8 +59,9 @@ try {
       continue;
     }
 
-    const missing = program.days.flatMap(day => day.exercises.map(item => item.slug)).filter(slug => !exerciseIds.has(slug));
-    if (missing.length) throw new Error(`Cannot seed ${program.name}; missing exercises: ${[...new Set(missing)].join(", ")}`);
+    const usedSlugs = program.days.flatMap(day => day.exercises.map(item => item.slug));
+    const missing = [...new Set(usedSlugs)].filter(slug => !FREE_EXERCISE_SET.has(slug) || !exerciseIds.has(slug));
+    if (missing.length) throw new Error(`Cannot seed ${program.name}; unsupported/missing exercises: ${missing.join(", ")}`);
 
     await prisma.workoutPlan.create({
       data: {

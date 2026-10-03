@@ -38,8 +38,6 @@ async function regeneratePendingPlan(userId: string) {
     await prisma.onboardingResponse.update({ where: { userId }, data: { preferencesJson: JSON.stringify(preferences) } });
     return true;
   } catch (error) {
-    // The workout has already been completed. Keep the pending flag so the
-    // next successful session completion can retry without losing the user's request.
     console.error("[workouts/session] deferred plan regeneration", error);
     return false;
   }
@@ -70,15 +68,22 @@ export async function POST(request: Request) {
     if (!templateId) return NextResponse.json({ error: "Workout non valido." }, { status: 400 });
     const template = await prisma.workoutTemplate.findFirst({ where: { id: templateId, plan: { userId: user.id, isActive: true, isTemplate: false } }, select: { id: true, workoutPlanId: true } });
     if (!template) return NextResponse.json({ error: "Workout non disponibile." }, { status: 404 });
-    const scheduledDate = parseDate(body.date);
-    const schedule = scheduledDate
-      ? await prisma.workoutSchedule.findFirst({ where: { userId: user.id, workoutPlanId: template.workoutPlanId, templateId: template.id, scheduledDate }, select: { id: true } })
-      : null;
+    const requestedDate = parseDate(body.date);
+    const todayStart = new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate());
+
+    // A workout started from a generic entry point must still belong to a
+    // calendar occurrence. This prevents orphan sessions that cannot be
+    // resumed from the calendar after leaving the workout.
+    const schedule = requestedDate
+      ? await prisma.workoutSchedule.findFirst({ where: { userId: user.id, workoutPlanId: template.workoutPlanId, templateId: template.id, scheduledDate: requestedDate }, select: { id: true, scheduledDate: true } })
+      : await prisma.workoutSchedule.findFirst({ where: { userId: user.id, workoutPlanId: template.workoutPlanId, templateId: template.id, scheduledDate: { gte: todayStart }, session: { is: null } }, orderBy: { scheduledDate: "asc" }, select: { id: true, scheduledDate: true } });
+
+    if (!schedule) return NextResponse.json({ error: "Questo workout non è programmato nel calendario." }, { status: 409 });
 
     const result = await prisma.$transaction(async (tx) => {
       const open = await tx.workoutSession.findFirst({ where: { userId: user.id, completedAt: null }, orderBy: { startedAt: "desc" }, include: { schedule: { select: { id: true, templateId: true } } } });
       if (open) {
-        const sameWorkout = open.workoutPlanId === template.workoutPlanId && (schedule ? open.scheduleId === schedule.id : open.scheduleId === null);
+        const sameWorkout = open.workoutPlanId === template.workoutPlanId && open.scheduleId === schedule.id;
         if (!sameWorkout) {
           return { conflict: NextResponse.json({ error: "Hai già un allenamento in corso. Riprendilo o terminalo prima di iniziarne un altro." }, { status: 409 }) };
         }
@@ -89,22 +94,20 @@ export async function POST(request: Request) {
         return { session: open, resumed: false };
       }
 
-      if (schedule) {
-        const previous = await tx.workoutSession.findUnique({ where: { scheduleId: schedule.id }, select: { id: true, completedAt: true, endedEarly: true } });
-        if (previous?.completedAt && !previous.endedEarly) {
-          return { conflict: NextResponse.json({ error: "Questo allenamento è già stato completato." }, { status: 409 }) };
-        }
-        if (previous?.completedAt && previous.endedEarly) {
-          await tx.workoutSession.update({ where: { id: previous.id }, data: { scheduleId: null } });
-        }
+      const previous = await tx.workoutSession.findUnique({ where: { scheduleId: schedule.id }, select: { id: true, completedAt: true, endedEarly: true } });
+      if (previous?.completedAt && !previous.endedEarly) {
+        return { conflict: NextResponse.json({ error: "Questo allenamento è già stato completato." }, { status: 409 }) };
+      }
+      if (previous?.completedAt && previous.endedEarly) {
+        await tx.workoutSession.update({ where: { id: previous.id }, data: { scheduleId: null } });
       }
 
-      const session = await tx.workoutSession.create({ data: { userId: user.id, workoutPlanId: template.workoutPlanId, scheduleId: schedule?.id ?? null }, select: { id: true, startedAt: true, pausedAt: true, elapsedSeconds: true } });
+      const session = await tx.workoutSession.create({ data: { userId: user.id, workoutPlanId: template.workoutPlanId, scheduleId: schedule.id }, select: { id: true, startedAt: true, pausedAt: true, elapsedSeconds: true } });
       return { session, created: true };
     });
 
     if ("conflict" in result) return result.conflict;
-    return NextResponse.json({ session: result.session, resumed: result.resumed ?? false }, { status: result.created ? 201 : 200 });
+    return NextResponse.json({ session: result.session, resumed: result.resumed ?? false, scheduledDate: schedule.scheduledDate }, { status: result.created ? 201 : 200 });
   } catch (error) {
     console.error("[workouts/session POST]", error);
     return NextResponse.json({ error: "Impossibile avviare l'allenamento." }, { status: 500 });
@@ -121,14 +124,7 @@ export async function PATCH(request: Request) {
     const action = body.action ?? "complete";
     if (action !== "pause" && action !== "finish" && action !== "complete") return NextResponse.json({ error: "Azione non valida." }, { status: 400 });
     if (!sessionId) return NextResponse.json({ error: "Sessione non valida." }, { status: 400 });
-    const session = await prisma.workoutSession.findFirst({
-      where: { id: sessionId, userId: user.id, completedAt: null },
-      include: {
-        sets: true,
-        schedule: { include: { template: { include: { exercises: { select: { exerciseId: true, sets: true } } } } } },
-        plan: { select: { templates: { include: { exercises: { select: { exerciseId: true, sets: true } } } } } },
-      },
-    });
+    const session = await prisma.workoutSession.findFirst({ where: { id: sessionId, userId: user.id, completedAt: null }, include: { sets: true, schedule: { include: { template: { include: { exercises: { select: { exerciseId: true, sets: true } } } } } }, plan: { select: { templates: { include: { exercises: { select: { exerciseId: true, sets: true } } } } } } } });
     if (!session) return NextResponse.json({ error: "Sessione non trovata o già terminata." }, { status: 404 });
     if (action === "pause") {
       if (session.pausedAt) return NextResponse.json({ ok: true, paused: true, session: { id: session.id, startedAt: session.startedAt, pausedAt: session.pausedAt, elapsedSeconds: session.elapsedSeconds } });
